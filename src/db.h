@@ -23,6 +23,8 @@
 
 #define PROJECTILE_SPEED 0.01f;
 
+#define INVENTORY_MAX 15
+
 typedef enum {
   IDENT_UNKNOWN,
   IDENT_PLAYER,
@@ -31,6 +33,39 @@ typedef enum {
 
   IDENT_NUM
 } ident_e;
+
+typedef enum {
+  ITEM_NONE,
+
+  // one time use
+  ITEM_POTION_START,
+  ITEM_POTION_HEALING,
+  ITEM_POTION_END,
+
+  // one time use
+  ITEM_SCROLL_START,
+  ITEM_SCROLL_MAPPING,
+  ITEM_SCROLL_END,
+
+  // multi time use
+  ITEM_WAND_START,
+  ITEM_WAND_FIREBOLT,
+  ITEM_WAND_END,
+
+  // wearables
+  ITEM_GEAR_START,
+  ITEM_GEAR_CHAINHELM,
+  ITEM_GEAR_END,
+
+  ITEM_NUM
+} item_e;
+
+typedef struct {
+  char description[512];
+  char name[20];
+  int base_uses, identified;
+} item_info_t;
+extern item_info_t item_info[ITEM_NUM];
 
 typedef enum {
   BLOCK_NONE = 0,
@@ -44,6 +79,11 @@ typedef enum {
   BLOCK_WATER = 51,
   BLOCK_WATER_DEEP = 52,
   BLOCK_PILLAR,
+  BLOCK_SWORD = 53,
+  BLOCK_POTION,
+  BLOCK_SCROLL,
+  BLOCK_WAND,
+  BLOCK_GEAR,
 
   BLOCK_NUM
 } block_e;
@@ -84,5 +124,7 @@ static int get_solid(int tile) {
   
   return 1;
 }
+
+void db();
 
 #endif // DB_H

@@ -34,6 +34,81 @@ typedef struct {
   void (*action)(void);
 } keybind_t;
 
+static inline int key_to_num(SDL_Scancode key) {
+  int use_item = 0;
+  switch (key) {
+    case SDL_SCANCODE_A: {
+      use_item = 0;
+      break;
+    }
+    case SDL_SCANCODE_B: {
+      use_item = 1;
+      break;
+    }
+    case SDL_SCANCODE_C: {
+      use_item = 2;
+      break;
+    }
+    case SDL_SCANCODE_D: {
+      use_item = 3;
+      break;
+    }
+    case SDL_SCANCODE_E: {
+      use_item = 4;
+      break;
+    }
+    case SDL_SCANCODE_F: {
+      use_item = 5;
+      break;
+    }
+    case SDL_SCANCODE_G: {
+      use_item = 6;
+      break;
+    }
+    case SDL_SCANCODE_H: {
+      use_item = 7;
+      break;
+    }
+    case SDL_SCANCODE_I: {
+      use_item = 8;
+      break;
+    }
+    case SDL_SCANCODE_J: {
+      use_item = 9;
+      break;
+    }
+    case SDL_SCANCODE_K: {
+      use_item = 10;
+      break;
+    }
+    case SDL_SCANCODE_L: {
+      use_item = 11;
+      break;
+    }
+    case SDL_SCANCODE_N: {
+      use_item = 12;
+      break;
+    }
+    case SDL_SCANCODE_M: {
+      use_item = 13;
+      break;
+    }
+    case SDL_SCANCODE_O: {
+      use_item = 14;
+      break;
+    }
+    case SDL_SCANCODE_P: {
+      use_item = 15;
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+
+  return use_item;
+}
+
 /**
  * [input_event handles input events]
  * @param event [SDL_Event pointer]

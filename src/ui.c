@@ -8,6 +8,7 @@
 #include "input/input.h"
 
 int ui_rendering = 0;
+int ui_state = 0;
 tilesheet_packet_t ui_tiles;
 
 void ui_init()
@@ -63,18 +64,21 @@ void ui_print_entity_down(entity_t *e, const char *str, u32 y, u8 r, u8 g, u8 b,
 
 void ui_print(const char *str, u32 x, u32 y, u8 r, u8 g, u8 b, u8 a)
 {
-  ui_rendering = 1;
+  // ui_rendering = 1;
 
   for (int i=0; i<strlen(str); i++) {
     size_t c = str[i];
+
+    if (c == '\n')
+      break;
 
     if (c > 63 && c < 91)
       c -= 64;
 
     switch (c) {
       case ' ': {
-        x++;
-        continue;
+        c = 59;
+        break;
       }
       case '?': {
         c = 43;
@@ -90,6 +94,30 @@ void ui_print(const char *str, u32 x, u32 y, u8 r, u8 g, u8 b, u8 a)
       }
       case 'x': {
         c = 67;
+        break;
+      }
+      case '{': {
+        c = 68;
+        break;
+      }
+      case '}': {
+        c = 69;
+        break;
+      }
+      case '[': {
+        c = 70;
+        break;
+      }
+      case ']': {
+        c = 71;
+        break;
+      }
+      case ')': {
+        c = 40;
+        break;
+      }
+      case '(': {
+        c = 41;
         break;
       }
     }
@@ -110,18 +138,159 @@ void ui_print(const char *str, u32 x, u32 y, u8 r, u8 g, u8 b, u8 a)
   }
 }
 
+void ui_inventory(entity_t *e)
+{
+  int width = 24;
+  int x = (TILES_X/2) - (width/2), y = (TILES_Y/2) - (INVENTORY_MAX / 2);
+
+  ui_print("{_EQUIP_________________}", x, y++, 255, 255, 255, 255);
+  char buf[128];
+  int index = 0;
+  for (int i=0; i<INVENTORY_MAX; i++) {
+    for (int j=0; j<width; j++)
+      ui_print(" ", x+j, y, 255, 255, 255, 255);
+
+    // borders
+    ui_print("|", x, y, 255, 255, 255, 255);
+    ui_print("|", x+width, y, 255, 255, 255, 255);
+
+    int item = e->inventory.items[i];
+    if (item == ITEM_NONE)
+      continue;
+
+    int tile = 0;
+    if (item > ITEM_POTION_START && item < ITEM_POTION_END)
+      tile = BLOCK_POTION;
+    if (item > ITEM_SCROLL_START && item < ITEM_SCROLL_END)
+      tile = BLOCK_SCROLL;
+    if (item > ITEM_WAND_START && item < ITEM_WAND_END)
+      tile = BLOCK_WAND;
+    if (item > ITEM_GEAR_START && item < ITEM_GEAR_END)
+      tile = BLOCK_GEAR;
+    else
+      continue;
+
+    int on = e->inventory.equipt[i] ? 42 : BLOCK_NONE;
+
+    // item name
+    sprintf(buf, "%c)%c%s", 'A'+i, tile, item_info[item].name);
+    ui_print(buf, x+1, y, 255, 255, 255, 255);
+    sprintf(buf, "(%c", on);
+    ui_print(buf, x+width-2, y, 255, 255, 255, 255);
+    y++;
+  }
+  ui_print("[_______________________]", x, y, 255, 255, 255, 255);
+
+  ui_rendering = 1;
+  ui_state = UI_STATE_INVENTORY;
+}
+
+void ui_fire(entity_t *e)
+{
+  int width = 24;
+  int x = (TILES_X/2) - (width/2), y = (TILES_Y/2) - (INVENTORY_MAX / 2);
+
+  ui_print("{_FIRE__________________}", x, y++, 255, 255, 255, 255);
+  char buf[128];
+  int index = 0;
+  for (int i=0; i<INVENTORY_MAX; i++) {
+    for (int j=0; j<width; j++)
+      ui_print(" ", x+j, y, 255, 255, 255, 255);
+
+    // borders
+    ui_print("|", x, y, 255, 255, 255, 255);
+    ui_print("|", x+width, y, 255, 255, 255, 255);
+
+    int item = e->inventory.items[i];
+    if (item == ITEM_NONE)
+      continue;
+
+    int tile = 0;
+    if (item > ITEM_POTION_START && item < ITEM_POTION_END)
+      continue;
+    if (item > ITEM_SCROLL_START && item < ITEM_SCROLL_END)
+      continue;
+    if (item > ITEM_WAND_START && item < ITEM_WAND_END)
+      tile = BLOCK_WAND;
+    if (item > ITEM_GEAR_START && item < ITEM_GEAR_END)
+      continue;
+
+    int on = e->inventory.equipt[i] ? 42 : BLOCK_NONE;
+
+    // item name
+    sprintf(buf, "%c)%c%s", 'A'+i, tile, item_info[item].name);
+    ui_print(buf, x+1, y, 255, 255, 255, 255);
+    // sprintf(buf, "(%c", on);
+    // ui_print(buf, x+width-2, y, 255, 255, 255, 255);
+    y++;
+  }
+  ui_print("[_______________________]", x, y, 255, 255, 255, 255);
+
+  ui_rendering = 1;
+  ui_state = UI_STATE_INVENTORY;
+}
+
+void ui_use(entity_t *e)
+{
+  int width = 24;
+  int x = (TILES_X/2) - (width/2), y = (TILES_Y/2) - (INVENTORY_MAX / 2);
+
+  ui_print("{_USE___________________}", x, y++, 255, 255, 255, 255);
+  char buf[128];
+  int index = 0;
+  for (int i=0; i<INVENTORY_MAX; i++) {
+    for (int j=0; j<width; j++)
+      ui_print(" ", x+j, y, 255, 255, 255, 255);
+
+    // borders
+    ui_print("|", x, y, 255, 255, 255, 255);
+    ui_print("|", x+width, y, 255, 255, 255, 255);
+
+    int item = e->inventory.items[i];
+    if (item == ITEM_NONE)
+      continue;
+
+    int tile = 0;
+    if (item > ITEM_POTION_START && item < ITEM_POTION_END)
+      tile = BLOCK_POTION;
+    if (item > ITEM_SCROLL_START && item < ITEM_SCROLL_END)
+      tile = BLOCK_SCROLL;
+    if (item > ITEM_WAND_START && item < ITEM_WAND_END)
+      continue;
+    if (item > ITEM_GEAR_START && item < ITEM_GEAR_END)
+      continue;
+
+    int on = e->inventory.equipt[i] ? 42 : BLOCK_NONE;
+
+    // item name
+    sprintf(buf, "%c)%c%s", 'A'+i, tile, item_info[item].name);
+    ui_print(buf, x+1, y, 255, 255, 255, 255);
+    // sprintf(buf, "(%c", on);
+    // ui_print(buf, x+width-2, y, 255, 255, 255, 255);
+    y++;
+  }
+  ui_print("[_______________________]", x, y, 255, 255, 255, 255);
+
+  ui_rendering = 1;
+  ui_state = UI_STATE_INVENTORY;
+}
+
+void ui_character(entity_t *e)
+{
+  int x = 1;
+  if (e->position.to[0] < TILES_X/2)
+    x = TILES_X-10;
+
+  int y = 2;
+  ui_print("LEVEL", x, y, 255, 255, 255, 255);
+
+  ui_rendering = 1;
+  ui_state = UI_STATE_CHARACTER;
+}
+
 void ui_reset()
 {
   memset(ui_tiles.tiles, 0, sizeof(tile_t) * ui_tiles.w * ui_tiles.h);
   ui_rendering = 0;
-}
-
-void ui_keypress(int key)
-{
-  ui_reset();
-}
-
-void ui_mousepress(int x, int y)
-{
-  ui_reset();
+  ui_state = UI_STATE_NONE;
 }

@@ -4,7 +4,14 @@
 #include "main.h"
 #include "entity.h"
 
+typedef enum {
+  UI_STATE_NONE,
+  UI_STATE_INVENTORY,
+  UI_STATE_CHARACTER,
+} ui_state_e;
+
 extern int ui_rendering;
+extern int ui_state;
 
 void ui_init();
 
@@ -20,8 +27,12 @@ void ui_print(const char *str, u32 x, u32 y, u8 r, u8 g, u8 b, u8 a);
 
 void ui_reset();
 
-void ui_keypress(int key);
+void ui_inventory(entity_t *e);
 
-void ui_mousepress(int x, int y);
+void ui_fire(entity_t *e);
+
+void ui_use(entity_t *e);
+
+void ui_character();
 
 #endif // UI_H

@@ -18,6 +18,29 @@ static int max_height = 0;
   then you punch a door out in that wall at the roll of a dice
 */
 
+#define PREFAB_SIZE 32
+
+typedef struct {
+  u32 tiles[PREFAB_SIZE*PREFAB_SIZE];
+  u32 entities[PREFAB_SIZE*PREFAB_SIZE];
+  u32 width, height, doors, locked;
+} prefab_t;
+
+prefab_t prefab_treasure = {
+  {
+    58, 58, 58,
+    58, 58, 58,
+    58, 58, 58,
+  },
+  {
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0
+  },
+  3, 3, // 4x4
+  1, 1  // one door, locked
+};
+
 void print_slice(slice_t *map)
 {
   for (int y=0; y<map->height; y++) {
@@ -307,19 +330,21 @@ void place_halls(slice_t *slice, u32 chance)
         }
       }
 
+      int id = get_tile(slice, x-dx, y-dy)->room_id;
+
       if (path) {
         int x1 = x, y1 = y;
         for (int i=0; i<10; i++) {
-          if (get_tile(slice, x1, y1)->block == BLOCK_FLOOR) {
+          if (get_tile(slice, x1, y1)->block == BLOCK_FLOOR || i == 9) {
             get_tile(slice, x1, y1)->block = BLOCK_FLOOR;
+            get_tile(slice, x1-dx, y1-dy)->block = BLOCK_DOOR;
+            get_tile(slice, x1-dx, y1-dy)->room_id = id;
             break;
           }
           get_tile(slice, x1, y1)->block = BLOCK_FLOOR;
+          get_tile(slice, x1, y1)->room_id = id;
           get_tile(slice, x1+dy, y1+dx)->block = BLOCK_WALL;
           get_tile(slice, x1-dy, y1-dx)->block = BLOCK_WALL;
-
-          if (!i)
-            get_tile(slice, x1, y1)->block = BLOCK_DOOR;
 
           x1 += dx;
           y1 += dy;
@@ -429,8 +454,116 @@ void place_lake(slice_t *slice)
         tile->block = BLOCK_WATER_DEEP;
     }
   }
+}
 
-  P_DBG("Largest room %i of size %i\n", id, largest);
+void place_prefab(slice_t *slice, prefab_t *prefab)
+{
+  u32 len = slice->width * slice->height;
+  int *positions_x = malloc(sizeof(int) * len);
+  int *positions_y = malloc(sizeof(int) * len);
+  int index = 0;
+  for (int y=0; y<slice->height; y++) {
+    for (int x=0; x<slice->width; x++) {
+      positions_x[index] = x;
+      positions_y[index] = y;
+      index++;
+    }
+  }
+  // randomize viable door list
+  for (int i=0; i<len; i++) {
+    int temp_x = positions_x[i];
+    int temp_y = positions_y[i];
+
+    size_t rand_index = rand() % len;
+
+    positions_x[i] = positions_x[rand_index];
+    positions_y[i] = positions_y[rand_index];
+    positions_x[rand_index] = temp_x;
+    positions_y[rand_index] = temp_y;
+  }
+  
+  int room_id = 0, room_x = 0, room_y = 0;
+  for (int j=0; j<len; j++) {
+    int x = positions_x[j];
+    int y = positions_y[j];
+
+    tile_data_t *tile = get_tile(slice, x, y);
+    int id = tile->room_id;
+    if (tile->block != BLOCK_FLOOR)
+      continue;
+
+    // see if there's enough space
+    int nope = 0;
+    for (int y1=y; y1<=y+prefab->height; y1++) {
+      if (nope)
+        break;
+      for (int x1=x; x1<=x+prefab->width; x1++) {
+        if (nope)
+          break;
+        if (x1 < 0 || x1 > slice->width || y1 < 0 || y1 > slice->height) {
+          nope = 1;
+          break;
+        }
+
+        tile_data_t *tile2 = get_tile(slice, x1, y1);
+        if (tile2->room_id != id) {
+          nope = 1;
+          break;
+        }
+
+        if (tile2->block != BLOCK_FLOOR) {
+          nope = 1;
+          break;
+        }
+
+        if (x1 == x+(prefab->width-1) && y1 == y+(prefab->height-1)) {
+          int doors = 0;
+
+          for (int dy=0; dy<slice->height; dy++) {
+            for (int dx=0; dx<slice->width; dx++) {
+              if (get_tile(slice, dx, dy)->block == BLOCK_DOOR) {
+                for (int k=0; k<4; k++) {
+                  int tx = MAX(0, MIN(dx + adjacent[k][0], slice->width));
+                  int ty = MAX(0, MIN(dy + adjacent[k][1], slice->height));
+                  if (get_tile(slice, tx, ty)->room_id == tile->room_id && get_tile(slice, tx, ty)->block == BLOCK_FLOOR)
+                    doors++;
+                }
+              }
+            }
+          }
+
+          if (doors <= prefab->doors) {
+            room_id = tile->room_id;
+            room_x = x;
+            room_y = y;
+            nope = 1;
+            P_DBG("Doors %i\n", doors);
+            break;
+          }
+        }
+      }
+    }
+
+    if (room_id)
+      break; 
+  }
+  free(positions_x);
+  free(positions_y);
+
+  if (!room_id)
+    return;
+
+  for (int y=room_y; y<room_y+prefab->height; y++) {
+    for (int x=room_x; x<room_x+prefab->width; x++) {
+      int pindex = ((y-room_y) * prefab->width) + (x-room_x);
+      int tile = prefab->tiles[pindex];
+      int entity = prefab->entities[pindex];
+      if (tile)
+        get_tile(slice, x, y)->block = tile;
+    }
+  }
+
+  P_DBG("Found room %i\n", room_id);
 }
 
 void gen(tilesheet_packet_t *packet)
@@ -495,6 +628,9 @@ void gen(tilesheet_packet_t *packet)
   place_halls(&map, 1);
   clean_dungeon(&map);
   place_lake(&map);
+
+  // do prefabs
+  place_prefab(&map, &prefab_treasure);
 
   // generate tilemap packet
   packet->x = 0, packet->y = 0;

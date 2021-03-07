@@ -12,6 +12,13 @@
 extern u8 level_alpha[TILES_NUM];
 extern u8 fov_alpha[TILES_NUM];
 
+typedef struct comp_inventory_t {
+  int items[INVENTORY_MAX];
+  int uses[INVENTORY_MAX];
+  int equipt[INVENTORY_MAX];
+  int use;
+} comp_inventory_t;
+
 typedef struct comp_stats_t {
   int health, max_health;
   int level;
@@ -43,6 +50,7 @@ typedef struct {
   u32 renderable : 1;
   u32 move       : 1;
   u32 stats      : 1;
+  u32 inventory  : 1;
 } comp_flags_t;
 
 typedef struct {
@@ -58,7 +66,8 @@ typedef struct {
   comp_speed_t      speed;
   comp_renderable_t renderable;
   comp_move_t       move;
-  comp_stats_t      stats; 
+  comp_stats_t      stats;
+  comp_inventory_t  inventory;
 } entity_t;
 
 extern entity_t *entity_stack[ENTITY_STACK_MAX];
@@ -94,6 +103,13 @@ static void comp_stats(entity_t *e, int health, int level, int base_damage) {
   e->stats.level = level;
   e->stats.base_damage = base_damage;
 }
+static void comp_inventory(entity_t *e)
+{
+  memset(e->inventory.items, ITEM_NONE, sizeof(int) * INVENTORY_MAX);
+  memset(e->inventory.uses, 0, sizeof(int) * INVENTORY_MAX);
+  memset(e->inventory.equipt, 0, sizeof(int) * INVENTORY_MAX);
+  e->inventory.use = -1;
+}
 
 void entity_new(entity_t **ret, u32 identifier);
 void entity_remove(u32 id);
@@ -102,12 +118,13 @@ entity_t *entity_get(int x, int y);
 
 void dijkstra(int *arr, int tox, int toy, int w, int h);
 int dijkstra_lowest(vec2 out, int *arr, int tilex, int tiley, int w, int h);
-
+int inventory_add(entity_t *e, int item, int uses);
 
 void system_move(entity_t *e);
 void system_renderable(entity_t *e);
 void system_energy(entity_t *e);
 void system_stats(entity_t *e);
+void system_inventory(entity_t *e);
 
 
 void action_move(entity_t *e, u32 x, u32 y);
@@ -116,5 +133,7 @@ void action_stop(entity_t *e);
 void action_open(entity_t *e, u32 x, u32 y);
 void action_bump(entity_t *a, entity_t *b);
 void action_damage(entity_t *e, int damage);
+void action_use(entity_t *e, int item);
+
 
 #endif // ENTITY_H

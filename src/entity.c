@@ -174,6 +174,19 @@ void fov(entity_t *e)
   }
 }
 
+int inventory_add(entity_t *e, int item, int uses)
+{
+  for (int i=0; i<INVENTORY_MAX; i++) {
+    if (e->inventory.items[i] == ITEM_NONE) {
+      e->inventory.items[i] = item;
+      e->inventory.uses[i] = uses;
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 
 /*-----------------------------------------/
 /---------------- SYSTEMS -----------------/
@@ -331,6 +344,11 @@ void system_stats(entity_t *e)
   }
 }
 
+void system_inventory(entity_t *e)
+{
+
+}
+
 
 /*-----------------------------------------/
 /---------------- ACTIONS -----------------/
@@ -414,4 +432,9 @@ void action_damage(entity_t *e, int damage)
     paused = 1;
     action_stop(e);
   }
+}
+
+void action_use(entity_t *e, int item)
+{
+  e->inventory.use = item;
 }

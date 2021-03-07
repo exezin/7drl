@@ -23,6 +23,8 @@ projectile_t projectile = {0};
 
 int entity_index = 0;
 
+int use_item = 0;
+
 void (*direction_action)(entity_t*, u32, u32) = NULL;
 
 // keybinds with associated action
@@ -50,6 +52,10 @@ void game_action_upleft();
 void game_action_downleft();
 void game_action_upright();
 void game_action_downright();
+void game_action_use_item();
+void game_action_inventory();
+void game_action_fire();
+void game_action_use();
 
 
 /*-----------------------------------------/
@@ -126,7 +132,7 @@ void generate_dungeon(int depth)
 ERR game_init()
 {
   srand(time(NULL));
-  // srand(12);
+  // srand(5);
   
   // initialize the renderer
   if (render_init() == SUCCESS) {
@@ -160,6 +166,13 @@ ERR game_init()
   keybinds[SDL_SCANCODE_O].action = &game_action_door;
   keybinds[SDL_SCANCODE_PERIOD].action = &game_action_wait;
 
+  keybinds[SDL_SCANCODE_I].action = &game_action_inventory;
+  keybinds[SDL_SCANCODE_F].action = &game_action_fire;
+  keybinds[SDL_SCANCODE_U].action = &game_action_use;
+
+  // initialize the item db
+  db();
+
   // tilemap specifically for entities
   entity_tiles.x = 0, entity_tiles.y = 0;
   entity_tiles.zoom = 1;
@@ -170,10 +183,15 @@ ERR game_init()
 
   // initialize the player entity
   entity_new(&player, IDENT_PLAYER);
-  comp_renderable(player, 27, 255, 255, 255, 255);
+  comp_renderable(player, 38, 255, 255, 255, 255);
   comp_speed(player, 1.0f);
   comp_move(player);
   comp_stats(player, 10, 1, 5);
+  comp_inventory(player);
+  inventory_add(player, ITEM_POTION_HEALING, 1);
+  inventory_add(player, ITEM_SCROLL_MAPPING, 1);
+  inventory_add(player, ITEM_WAND_FIREBOLT, 10);
+  inventory_add(player, ITEM_GEAR_CHAINHELM, 1);
 
   generate_dungeon(dungeon_depth);
 
@@ -294,14 +312,16 @@ int game_run()
 
 void game_keypressed(SDL_Scancode key)
 {
-  if (ui_rendering) {
-    ui_keypress(key);
-  } else {
-    ui_reset();
-  }
-
   if (keybinds[key].action) {
-    keybinds[key].action();
+    use_item = key_to_num(key);
+
+    if (ui_state == UI_STATE_INVENTORY) {
+      game_action_use_item();
+      ui_reset();
+    } else {
+      ui_reset();
+      keybinds[key].action();
+    }
   }
 }
 
@@ -311,13 +331,8 @@ void game_mousepressed(int button)
   int mx = mouse_x, my = mouse_y;
   render_translate_mouse(&mx, &my);
 
-  if (ui_rendering) {
-    ui_mousepress(mx, my);
-    return;
-  }
-
   // handle contextual clicks
-  if (button == 3) {
+  if (button == 3 && !ui_rendering) {
     int tile = level.tiles[to_index(mx, my)].tile;
     int entity_tile = entity_tiles.tiles[to_index(mx, my)].tile;
     entity_t *entity = NULL;
@@ -391,7 +406,7 @@ void game_action_door()
 {
   direction_action = action_open;
 
-  ui_print_entity(player, "OPEN IN WHICH DIRECTION?", 5, 255, 255, 255, 200);
+  ui_print_entity(player, "OPEN IN WHICH DIRECTION?", 5, 255, 255, 255, 255);
   ui_rendering = 0;
 }
 
@@ -486,4 +501,25 @@ void game_action_downright()
 
   direction_action = NULL;
   paused = 0;
+}
+
+void game_action_use_item()
+{
+  action_use(player, use_item);
+  P_DBG("Use %i\n", use_item);
+}
+
+void game_action_inventory()
+{
+  ui_inventory(player);
+}
+
+void game_action_fire()
+{
+  ui_fire(player);
+}
+
+void game_action_use()
+{
+  ui_use(player);
 }
