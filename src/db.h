@@ -3,8 +3,8 @@
 
 // default values
 #define WINDOW_TITLE  "rl"
-#define WINDOW_WIDTH  432
-#define WINDOW_HEIGHT 261
+#define WINDOW_WIDTH  477 // 432
+#define WINDOW_HEIGHT 306 // 261
 #define WINDOW_FLAGS  SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
 
 // tilemap stuff
@@ -55,15 +55,30 @@ typedef enum {
   // wearables
   ITEM_GEAR_START,
   ITEM_GEAR_CHAINHELM,
+
+  ITEM_GEAR_WEAPON_START,
   ITEM_GEAR_END,
 
   ITEM_NUM
 } item_e;
 
+typedef enum {
+  SLOT_ARMS,
+  SLOT_HANDS,
+  SLOT_HEAD,
+  SLOT_CHEST,
+  SLOT_LEGS,
+  SLOT_FEET,
+  SLOT_RIGHT,
+  SLOT_LEFT,
+  SLOT_NUM
+} slot_e;
+
 typedef struct {
   char description[512];
   char name[20];
   int base_uses, identified;
+  int armor, damage, slot;
 } item_info_t;
 extern item_info_t item_info[ITEM_NUM];
 

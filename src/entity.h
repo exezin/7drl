@@ -16,12 +16,12 @@ typedef struct comp_inventory_t {
   int items[INVENTORY_MAX];
   int uses[INVENTORY_MAX];
   int equipt[INVENTORY_MAX];
-  int use;
+  int use, drop;
 } comp_inventory_t;
 
 typedef struct comp_stats_t {
   int health, max_health;
-  int level;
+  int level, exp;
 
   int base_damage;
 } comp_stats_t;
@@ -41,7 +41,8 @@ typedef struct comp_renderable_t {
 
 typedef struct comp_move_t {
   int target[2];
-  int *dmap, w, h;
+  int *dmap;
+  int w, h;
 } comp_move_t;
 
 typedef struct {
@@ -57,6 +58,7 @@ typedef struct {
   u32 id, ident;
   int alive;
   float energy;
+  char name[64];
 
   // components we can have
   comp_flags_t      components;
@@ -101,17 +103,20 @@ static void comp_stats(entity_t *e, int health, int level, int base_damage) {
   e->stats.health = health;
   e->stats.max_health = health;
   e->stats.level = level;
+  e->stats.exp = 0;
   e->stats.base_damage = base_damage;
 }
 static void comp_inventory(entity_t *e)
 {
+  e->components.inventory = 1;
   memset(e->inventory.items, ITEM_NONE, sizeof(int) * INVENTORY_MAX);
   memset(e->inventory.uses, 0, sizeof(int) * INVENTORY_MAX);
   memset(e->inventory.equipt, 0, sizeof(int) * INVENTORY_MAX);
   e->inventory.use = -1;
+  e->inventory.drop = -1;
 }
 
-void entity_new(entity_t **ret, u32 identifier);
+void entity_new(entity_t **ret, u32 identifier, const char *name);
 void entity_remove(u32 id);
 entity_t *entity_get(int x, int y);
 
@@ -119,6 +124,7 @@ entity_t *entity_get(int x, int y);
 void dijkstra(int *arr, int tox, int toy, int w, int h);
 int dijkstra_lowest(vec2 out, int *arr, int tilex, int tiley, int w, int h);
 int inventory_add(entity_t *e, int item, int uses);
+void player_path(entity_t *e);
 
 void system_move(entity_t *e);
 void system_renderable(entity_t *e);
@@ -134,6 +140,7 @@ void action_open(entity_t *e, u32 x, u32 y);
 void action_bump(entity_t *a, entity_t *b);
 void action_damage(entity_t *e, int damage);
 void action_use(entity_t *e, int item);
+void action_drop(entity_t *e, int item);
 
 
 #endif // ENTITY_H

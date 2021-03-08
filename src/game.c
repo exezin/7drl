@@ -24,6 +24,7 @@ projectile_t projectile = {0};
 int entity_index = 0;
 
 int use_item = 0;
+int tile_on = 0;
 
 void (*direction_action)(entity_t*, u32, u32) = NULL;
 
@@ -39,7 +40,7 @@ int dungeon_depth = 0;
 entity_t *player = NULL, *monster;
 
 // dijkstra maps
-int path_to_player[TILES_NUM], path_from_player[TILES_NUM], path_to_mouse[TILES_NUM];
+int path_to_player[TILES_NUM] = {0}, path_from_player[TILES_NUM] = {0}, path_to_mouse[TILES_NUM] = {0};
 
 // prototypes
 void game_action_door();
@@ -53,6 +54,7 @@ void game_action_downleft();
 void game_action_upright();
 void game_action_downright();
 void game_action_use_item();
+void game_action_drop_item();
 void game_action_inventory();
 void game_action_fire();
 void game_action_use();
@@ -120,7 +122,14 @@ void generate_dungeon(int depth)
   gen(&level);
 
   // move the player into position
-  comp_position(player, TILES_X/2, TILES_Y/2);
+  int x, y;
+  int tile = 0;
+  while (tile != BLOCK_FLOOR) {
+    x = rand() % level.w;
+    y = rand() % level.h;
+    tile = level.tiles[(y * level.w) + x].tile;
+  }
+  comp_position(player, x, y);
   player->position.to[1] -= 1;
   action_move(player, player->position.to[0], player->position.to[1]+1);
 }
@@ -182,26 +191,38 @@ ERR game_init()
   entity_tiles.tiles = calloc(1, sizeof(tile_t) * entity_tiles.w * entity_tiles.h);
 
   // initialize the player entity
-  entity_new(&player, IDENT_PLAYER);
+  entity_new(&player, IDENT_PLAYER, "PLAYER");
   comp_renderable(player, 38, 255, 255, 255, 255);
   comp_speed(player, 1.0f);
   comp_move(player);
-  comp_stats(player, 10, 1, 5);
+  comp_stats(player, 100, 1, 5);
   comp_inventory(player);
   inventory_add(player, ITEM_POTION_HEALING, 1);
   inventory_add(player, ITEM_SCROLL_MAPPING, 1);
   inventory_add(player, ITEM_WAND_FIREBOLT, 10);
   inventory_add(player, ITEM_GEAR_CHAINHELM, 1);
+  inventory_add(player, ITEM_GEAR_CHAINHELM, 1);
 
   generate_dungeon(dungeon_depth);
 
   // initialize the player entity
-  entity_new(&monster, IDENT_NPC);
-  comp_position(monster, TILES_X/2, (TILES_Y/2)-2);
-  comp_renderable(monster, 'G'-64, 255, 255, 255, 255);
-  comp_speed(monster, 0.5f);
-  comp_move(monster);
-  comp_stats(monster, 5, 1, 5);
+  for (int i=0; i<10; i++) {
+    int x, y;
+    int tile = 0;
+    while (tile != BLOCK_FLOOR) {
+      x = rand() % level.w;
+      y = rand() % level.h;
+      tile = level.tiles[(y * level.w) + x].tile;
+    }
+    entity_new(&monster, IDENT_NPC, "GOBLIN");
+    comp_position(monster, x, y);
+    comp_renderable(monster, 'G'-64, 255, 255, 255, 255);
+    comp_speed(monster, 0.5f);
+    comp_move(monster);
+    comp_stats(monster, 50, 1, 5);
+    // if (monster)
+      action_path(monster, path_to_player, TILES_X, TILES_Y);
+  }
  
   return SUCCESS;
 }
@@ -260,6 +281,7 @@ int game_run()
       system_energy(e);
       system_stats(e);
       system_move(e);
+      system_inventory(e);
       system_renderable(e);
 
       // did this entity spawn a projectile?
@@ -271,7 +293,7 @@ int game_run()
 
       entity_index = 0;
 
-      if (!e->alive)
+      if (!e->alive && e->ident != IDENT_PLAYER)
         entity_remove(e->id);
 
       // an action might have not performed
@@ -279,6 +301,8 @@ int game_run()
       if (paused)
         break;
     }
+
+    player_path(player);
 
     if (player->energy >= ENERGY_MIN && !player->move.dmap)
       paused = 1;
@@ -312,15 +336,48 @@ int game_run()
 
 void game_keypressed(SDL_Scancode key)
 {
-  if (keybinds[key].action) {
+  if (ui_state != UI_STATE_ITEM)
     use_item = key_to_num(key);
 
-    if (ui_state == UI_STATE_INVENTORY) {
-      game_action_use_item();
+  if (key == SDL_SCANCODE_ESCAPE) {
+    ui_state = UI_STATE_NONE;
+    ui_reset();
+  }
+
+  switch (ui_state) {
+    case UI_STATE_INVENTORY: {
+      ui_item(player, use_item);
+      break;
+    }
+    case UI_STATE_FIRE: {
+      if (player->inventory.items[use_item] > ITEM_WAND_START &&
+          player->inventory.items[use_item] < ITEM_WAND_END) {
+        game_action_use_item();
+      }
       ui_reset();
-    } else {
+      break;
+    }
+    case UI_STATE_USE: {
+      if (player->inventory.items[use_item] < ITEM_SCROLL_END) {
+        game_action_use_item();
+      }
       ui_reset();
-      keybinds[key].action();
+      break;
+    }
+    case UI_STATE_ITEM: {
+      if (key == SDL_SCANCODE_A)
+        game_action_use_item();
+      if (key == SDL_SCANCODE_B)
+        game_action_drop_item();
+      ui_reset();
+      break;
+    }
+    default: {
+      if (keybinds[key].action) {
+        ui_reset();
+        keybinds[key].action();
+      }
+      break;
     }
   }
 }
@@ -330,6 +387,8 @@ void game_mousepressed(int button)
   // translate mouse to tile coords
   int mx = mouse_x, my = mouse_y;
   render_translate_mouse(&mx, &my);
+  
+  ui_reset();
 
   // handle contextual clicks
   if (button == 3 && !ui_rendering) {
@@ -381,7 +440,7 @@ void game_mousemotion(int dx, int dy)
 /-----------------------------------------*/
 void game_update(double step, double dt)
 {
-  action_path(monster, path_to_player, TILES_X, TILES_Y);
+  tile_on = level.tiles[(player->position.to[1] * TILES_X) + player->position.to[0]].tile;
 }
 
 void game_render()
@@ -391,9 +450,14 @@ void game_render()
     if (tile->a <= 50.0f)
       continue;
 
-    if ((tile->tile == BLOCK_WATER || tile->tile == BLOCK_WATER_DEEP) && !(rand() % 200))
+    if (fov_alpha[i] <= 50.0f)
+      continue;
+
+    if ((tile->tile == BLOCK_WATER || tile->tile == BLOCK_WATER_DEEP || tile->tile == BLOCK_FLOOR+1) && !(rand() % 200))
       tile->a = fov_alpha[i] - (rand() % (fov_alpha[i]/4));
   }
+
+  ui_character(player);
 
   render_tilemap(&level);
   render_tilemap(&entity_tiles);
@@ -506,7 +570,15 @@ void game_action_downright()
 void game_action_use_item()
 {
   action_use(player, use_item);
-  P_DBG("Use %i\n", use_item);
+
+  paused = 0;
+}
+
+void game_action_drop_item()
+{
+  action_drop(player, use_item);
+
+  paused = 0;
 }
 
 void game_action_inventory()

@@ -1,5 +1,6 @@
 #include "entity.h"
 #include "game.h"
+#include "ui.h"
 #include "render/render.h"
 
 entity_t *entity_stack[ENTITY_STACK_MAX] = {0};
@@ -9,7 +10,7 @@ extern tilesheet_packet_t level, entity_tiles;
 u8 level_alpha[TILES_NUM] = {0};
 u8 fov_alpha[TILES_NUM] = {0};
 
-void entity_new(entity_t **ret, u32 identifier)
+void entity_new(entity_t **ret, u32 identifier, const char *name)
 {
   for (int i=0; i<ENTITY_STACK_MAX; i++) {
     if (entity_stack[i] == NULL) {
@@ -17,6 +18,7 @@ void entity_new(entity_t **ret, u32 identifier)
       entity_stack[i]->alive = 1;
       entity_stack[i]->id    = i;
       entity_stack[i]->ident = identifier;
+      strcpy(entity_stack[i]->name, name);
       *ret = entity_stack[i];
       return;
     }
@@ -30,10 +32,6 @@ void entity_remove(u32 id)
   if (id < ENTITY_STACK_MAX && entity_stack[id]) {
     entity_t *e = entity_stack[id];
 
-    if (e->components.position && e->components.renderable) {
-      entity_tiles.tiles[to_index(e->position.to[0], e->position.to[1])].tile = 0;
-    }
-
     free(entity_stack[id]);
     entity_stack[id] = NULL;
   }
@@ -45,7 +43,7 @@ entity_t *entity_get(int x, int y)
     entity_t *e = entity_stack[i];
 
     if (!e || !e->alive || !e->components.position)
-      return NULL;
+      continue;
 
     if (e->position.to[0] == x && e->position.to[1] == y)
       return e;
@@ -65,6 +63,8 @@ void dijkstra(int *arr, int tox, int toy, int w, int h)
         u32 index = (y * w) + x;
         int tile = level.tiles[index].tile;
         arr[index] = get_walkable(tile) ? DIJ_MAX : -(DIJ_MAX+1);
+        if (entity_get(x, y))
+          arr[index] = -(DIJ_MAX+1);
 
         if (x == tox && y == toy) {
           arr[index] = 0;
@@ -116,12 +116,17 @@ void dijkstra(int *arr, int tox, int toy, int w, int h)
 int dijkstra_lowest(vec2 out, int *arr, int tilex, int tiley, int w, int h)
 {
   int on = arr[(tiley * w) + tilex];
+  if (on == -(DIJ_MAX+1))
+    on = DIJ_MAX;
   
   int lowest = DIJ_MAX;
   for (int i=0; i<8; i++) {
     int x = MAX(0, MIN(tilex + around_adjacent[i][0], w));
     int y = MAX(0, MIN(tiley + around_adjacent[i][1], h));
     int tile = arr[(y * w) + x];
+
+    if (tile == -(DIJ_MAX+1))
+      continue;
     
     // move to it
     if (tile > -(DIJ_MAX+1) && tile < lowest && tile < on) {
@@ -187,6 +192,23 @@ int inventory_add(entity_t *e, int item, int uses)
   return 0;
 }
 
+void player_path(entity_t *e)
+{
+  // are we the player?
+  dijkstra(path_to_player, e->position.to[0], e->position.to[1], TILES_X, TILES_Y);
+
+  // flee map
+  memcpy(path_from_player, path_to_player, sizeof(int) * TILES_X * TILES_Y);
+  for (int i=0; i<TILES_NUM; i++) {
+  if (path_from_player[i] == DIJ_MAX)
+      path_from_player[i] = -DIJ_MAX;
+    else if (path_from_player[i] != -(DIJ_MAX+1))
+      path_from_player[i] = -(path_to_player[i] * 1.2f);
+  }
+  dijkstra(path_from_player, -1, -1, TILES_X, TILES_Y);
+
+  fov(e);
+}
 
 /*-----------------------------------------/
 /---------------- SYSTEMS -----------------/
@@ -265,7 +287,8 @@ void system_move(entity_t *e)
     // do bump attack
     case IDENT_PLAYER:
     case IDENT_NPC: {
-      action_bump(e, entity);
+      if (e->ident != entity->ident)
+        action_bump(e, entity);
       action_stop(e);
       e->energy -= ENERGY_MIN;
       return;
@@ -279,6 +302,7 @@ void system_move(entity_t *e)
   tile = level.tiles[to_index(to[0], to[1])].tile;
   switch (tile) {
     // hit a solid, perform no action
+    case BLOCK_WATER_DEEP:
     case BLOCK_WALL_V:
     case BLOCK_WALL: {
       action_stop(e);
@@ -300,23 +324,6 @@ void system_move(entity_t *e)
       e->position.to[0] = to[0];
       e->position.to[1] = to[1];
       e->energy -= ENERGY_MIN;
-
-      // are we the player?
-      if (e->ident == IDENT_PLAYER) {
-        dijkstra(path_to_player, to[0], to[1], TILES_X, TILES_Y);
-
-        // flee map
-        memcpy(path_from_player, path_to_player, sizeof(int) * TILES_X * TILES_Y);
-        for (int i=0; i<TILES_NUM; i++) {
-        if (path_from_player[i] == DIJ_MAX)
-            path_from_player[i] = -DIJ_MAX;
-          else if (path_from_player[i] != -(DIJ_MAX+1))
-            path_from_player[i] = -(path_to_player[i] * 1.2f);
-        }
-        dijkstra(path_from_player, -1, -1, TILES_X, TILES_Y);
-
-        fov(e);
-      }
       break;
     }
   }
@@ -346,16 +353,52 @@ void system_stats(entity_t *e)
 
 void system_inventory(entity_t *e)
 {
+  if (!e->components.inventory || e->energy < ENERGY_MIN)
+    return;
 
+
+  if (e->inventory.drop > -1) {
+    int index = e->inventory.drop;
+
+    e->inventory.drop = -1;
+    e->energy -= ENERGY_MIN;
+    return;
+  }
+
+  if (e->inventory.use > -1) {
+    int index = e->inventory.use;
+    int item = e->inventory.items[index];
+
+    if (item > ITEM_GEAR_START) {
+      int slot = item_info[item].slot;
+      for (int i=0; i<INVENTORY_MAX; i++) {
+        if (i != index && e->inventory.equipt[i] && item_info[e->inventory.items[i]].slot == slot) {
+          e->inventory.equipt[i] = 0;
+        }
+      }
+      if (e->ident == IDENT_PLAYER) {
+        if (e->inventory.equipt[index])
+          ui_popup(e, "YOU TAKE OFF THE THING", 255, 255, 120, 255);
+        else
+          ui_popup(e, "YOU PUT ON THE THING", 255, 255, 120, 255);
+      }
+      
+      e->inventory.equipt[index] = !e->inventory.equipt[index];
+    }
+    
+    e->inventory.use = -1;
+    e->energy -= ENERGY_MIN;
+    return;
+  }
 }
 
 
-/*-----------------------------------------/
+/*-----------------------------------------/ 
 /---------------- ACTIONS -----------------/
 /-----------------------------------------*/
 void action_move(entity_t *e, u32 x, u32 y)
 {
-  if (!e->components.move)
+  if (!e || !e->components.move)
     return;
 
   e->move.dmap = NULL;
@@ -365,7 +408,7 @@ void action_move(entity_t *e, u32 x, u32 y)
 
 void action_path(entity_t *e, int *path, u32 w, u32 h)
 {
-  if (!e->components.move)
+  if (!e || !e->components.move || !path)
     return;
 
   e->move.dmap = path;
@@ -375,18 +418,20 @@ void action_path(entity_t *e, int *path, u32 w, u32 h)
 
 void action_stop(entity_t *e)
 {
-  if (!e->components.move || !e->components.position)
+  if (!e || !e->components.move || !e->components.position)
     return;
 
   e->move.target[0] = e->position.to[0];
   e->move.target[1] = e->position.to[1];
-  e->move.dmap = NULL;
+
+  if (e->ident == IDENT_PLAYER)
+    e->move.dmap = NULL;
 }
 
 void action_open(entity_t *e, u32 x, u32 y)
 {
   // do we have energy to move?
-  if (e->energy < ENERGY_MIN)
+  if (!e || e->energy < ENERGY_MIN)
     return;
 
   int distance = MAX(abs(e->position.to[0] - x), abs(e->position.to[1] - y));
@@ -410,17 +455,48 @@ void action_open(entity_t *e, u32 x, u32 y)
 
 void action_bump(entity_t *a, entity_t *b)
 {
-  if (!a->components.stats || !b->components.stats)
+  if (!a || !b || !a->components.stats || !b->components.stats)
     return;
 
-  int damage = a->stats.base_damage;
+  int weapon = 0;
+  if (a->components.inventory) {
+    for (int i=0; i<INVENTORY_MAX; i++) {
+      if (a->inventory.equipt[i] && a->inventory.items[i] > ITEM_GEAR_WEAPON_START) {
+        weapon += item_info[a->inventory.items[i]].damage;
+      }
+    }
+  }
+
+  int damage = a->stats.base_damage + weapon;
 
   action_damage(b, damage);
 }
 
 void action_damage(entity_t *e, int damage)
 {
+  if (!e || !e->components.stats)
+    return;
+
+  int defense = 0;
+  if (e->components.inventory) {
+    for (int i=0; i<INVENTORY_MAX; i++) {
+      if (e->inventory.equipt[i] && e->inventory.items[i] > ITEM_GEAR_START) {
+        defense += item_info[e->inventory.items[i]].armor;
+      }
+    }
+  }
+
+  damage = MAX(1, damage - defense);
+
   e->stats.health -= damage;
+
+  ui_print("x", e->position.to[0], e->position.to[1], 255, 120, 120, 255);
+
+  if (e->ident != IDENT_PLAYER) {
+    char buf[128];
+    sprintf(buf, "%s HIT FOR %i DAMAGE", e->name, damage);
+    ui_popup(e, buf, 255, 120, 120, 255);
+  }
 
   // dead
   if (e->stats.health <= 0) {
@@ -429,12 +505,22 @@ void action_damage(entity_t *e, int damage)
   }
 
   if (e->ident == IDENT_PLAYER) {
-    paused = 1;
     action_stop(e);
   }
 }
 
 void action_use(entity_t *e, int item)
 {
-  e->inventory.use = item;
+  if (!e || !e->components.inventory)
+    return;
+
+  e->inventory.use = item; 
+}
+
+void action_drop(entity_t *e, int item)
+{
+  if (!e || !e->components.inventory)
+    return;
+
+  e->inventory.drop = item;
 }

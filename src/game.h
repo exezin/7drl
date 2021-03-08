@@ -26,6 +26,8 @@ extern projectile_t projectile;
 extern double game_tick;
 extern int path_to_player[], path_from_player[], path_to_mouse[];
 extern int paused;
+extern int tile_on;
+extern int dungeon_depth;
 
 void projectile_start(int fromx, int fromy, int tox, int toy, int t);
 

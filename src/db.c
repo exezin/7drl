@@ -29,6 +29,8 @@ void db()
   db_set_desc(ITEM_WAND_FIREBOLT, "A WAND OF FIRE BOLT");
 
   item_info[ITEM_GEAR_CHAINHELM].base_uses = 1;
+  item_info[ITEM_GEAR_CHAINHELM].armor = 5;
+  item_info[ITEM_GEAR_CHAINHELM].slot = SLOT_HEAD;
   db_set_name(ITEM_GEAR_CHAINHELM, "CHAINMAIL HELM");
-  db_set_desc(ITEM_GEAR_CHAINHELM, "A HELMET MADE OF CHAINMAIL");
+  db_set_desc(ITEM_GEAR_CHAINHELM, "A HELMET MADE OF CHAIN MAIL");
 }

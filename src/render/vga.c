@@ -2,6 +2,7 @@
 #include "render/vga_font.h"
 #include "render/shader.h"
 #include "render/render.h"
+#include "db.h"
 #include "math/linmath.h"
 #include <stdio.h>
 
@@ -9,9 +10,6 @@
 #define VGA_FONT_HEIGHT 16
 #define VGA_WIDTH  432
 #define VGA_HEIGHT 261
-
-#define WINDOW_WIDTH  432
-#define WINDOW_HEIGHT 261
 
 static u32 *vga_data = NULL;
 static u32 vga_fg = 0xFFFFFFFF, vga_bg = 0x00000000;

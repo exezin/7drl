@@ -24,6 +24,7 @@ typedef struct {
   u32 tiles[PREFAB_SIZE*PREFAB_SIZE];
   u32 entities[PREFAB_SIZE*PREFAB_SIZE];
   u32 width, height, doors, locked;
+  int room_type;
 } prefab_t;
 
 prefab_t prefab_treasure = {
@@ -38,7 +39,8 @@ prefab_t prefab_treasure = {
     0, 0, 0, 0
   },
   3, 3, // 4x4
-  1, 1  // one door, locked
+  1, 1, // one door, locked
+  ROOM_STORAGE
 };
 
 void print_slice(slice_t *map)
@@ -297,8 +299,8 @@ void place_halls(slice_t *slice, u32 chance)
         y1 += dy;
 
         int found_door = 0;
-        for (int j=y1-1; j<=y1+1; j++) {
-          for (int k=x1-1; k<=x1+1; k++) {
+        for (int j=y1-2; j<=y1+2; j++) { // -1 +1
+          for (int k=x1-2; k<=x1+2; k++) { // -1 +1
             if (get_tile(slice, k, j)->block == BLOCK_DOOR) {
               found_door = 1;
             }
@@ -358,6 +360,12 @@ void clean_dungeon(slice_t *slice)
 {
   for (int y=1; y<slice->height-1; y++) {
     for (int x=1; x<slice->width-1; x++) {
+      // if (get_tile(slice, x, y)->block != BLOCK_NONE) {
+      //   if (x <= 1 || x >= slice->width-2 || y <= 1 || y >= slice->height-2)
+      //     get_tile(slice, x, y)->block = BLOCK_WALL;
+      //   if (x <= 0 || x >= slice->width-1 || y <= 0 || y >= slice->height-1)
+      //     get_tile(slice, x, y)->block = BLOCK_NONE;
+      // }
       if (get_tile(slice, x, y)->block != BLOCK_WALL)
         continue;
 
@@ -385,8 +393,14 @@ void place_lake(slice_t *slice)
   for (int i=1; i<slice->room_count; i++) {
     int size = 0;
     for (int j=0; j<slice->width*slice->height; j++) {
-      if (slice->tiles[j].room_id == i)
+      if (slice->tiles[j].room_id == i) {
         size++;
+        if (slice->tiles[j].block == BLOCK_WATER ||
+            slice->tiles[j].block == BLOCK_WATER_DEEP) {
+          size = 0;
+          break;
+        }
+      }
     }
 
     if (size > largest) {
@@ -563,19 +577,34 @@ void place_prefab(slice_t *slice, prefab_t *prefab)
     }
   }
 
+  // change blocks per room typeww
+  for (int i=0; i<slice->width*slice->height; i++) {
+    if (slice->tiles[i].room_id != room_id)
+      continue;
+
+    slice->tiles[i].room = prefab->room_type;
+
+    // switch (prefab->room_type) {
+    //   case ROOM_ARMORY: {
+    //     if (block == BLOCK_WALL)
+    //     break;
+    //   }
+    // }
+  }
+
   P_DBG("Found room %i\n", room_id);
 }
 
 void gen(tilesheet_packet_t *packet)
 {
   // create initial empty map
-  max_width = WINDOW_WIDTH / TILE_RWIDTH;
-  max_height = WINDOW_HEIGHT / TILE_RHEIGHT;
+  max_width = (WINDOW_WIDTH / TILE_RWIDTH) - 2;
+  max_height = (WINDOW_HEIGHT / TILE_RHEIGHT) - 2;
   slice_t map = new_slice_sized(max_width, max_height);
 
   // initial room (placed in center)
   slice_t slice = new_slice();
-  place_cave(&slice, 18 + rand() % 9);
+  place_cave(&slice, 18 + rand() % 13);
   clean_slice(&slice);
   compress_slice(&slice);
   slice_set_id(&slice, map.room_count++);
@@ -609,7 +638,7 @@ void gen(tilesheet_packet_t *packet)
     }
     if (!(rand() % 3)) {
       destroy_slice(&room_parts);
-      slice_t room_parts = new_slice();
+      room_parts = new_slice();
       place_cave(&slice, 12 + rand() % 5);
       clean_slice(&slice);
       compress_slice(&slice);
@@ -624,13 +653,36 @@ void gen(tilesheet_packet_t *packet)
     destroy_slice(&room_parts);
     destroy_slice(&slice);
   }
+
+  for (int i=0; i<100; i++) {
+    slice_t room_parts = new_slice();
+    slice = new_slice();
+    int size = 4 + rand() % 2;
+    place_box(&slice, 0, 0, size + (rand() % 2), size + (rand() % 2));
+    place_box(&slice, 0, 0, size + (rand() % 3), size + (rand() % 3));
+    clean_slice(&slice);
+    compress_slice(&slice);
+    place_slice(&room_parts, &slice);
+    destroy_slice(&slice);
+
+    clean_slice(&room_parts);
+    compress_slice(&room_parts);
+    place_slice(&map, &room_parts);
+    destroy_slice(&room_parts);
+  }
+
+
   place_doors(&map, 1);
   place_halls(&map, 1);
   clean_dungeon(&map);
   place_lake(&map);
+  place_lake(&map);
 
   // do prefabs
   place_prefab(&map, &prefab_treasure);
+
+  slice_t real_map = new_slice_sized(max_width + 2, max_height + 2);
+  place_slice(&real_map, &map);
 
   // generate tilemap packet
   packet->x = 0, packet->y = 0;
@@ -641,15 +693,16 @@ void gen(tilesheet_packet_t *packet)
   if (packet->tiles)
     free(packet->tiles);
   packet->tiles = calloc(1, sizeof(tile_t) * packet->w * packet->h);
-  for (int y=0; y<map.height; y++) {
-    for (int x=0; x<map.width; x++) {
+  for (int y=0; y<real_map.height; y++) {
+    for (int x=0; x<real_map.width; x++) {
       u32 i = (y * packet->w) + x;
-      packet->tiles[i].tile = map.tiles[i].block;
-      if (packet->tiles[i].tile == BLOCK_FLOOR && rand() % 100 < 5)
+      u32 i2 = (y * packet->w) + x;
+      packet->tiles[i].tile = real_map.tiles[i].block;
+      if (packet->tiles[i].tile == BLOCK_FLOOR && rand() % 20 < 5)
         packet->tiles[i].tile++;
       switch (packet->tiles[i].tile) {
         case BLOCK_WALL: {
-          if (get_tile(&map, x, y+1)->block == BLOCK_WALL)
+          if (get_tile(&real_map, x, y+1)->block == BLOCK_WALL)
             packet->tiles[i].tile++;
           break;
         }
@@ -658,9 +711,9 @@ void gen(tilesheet_packet_t *packet)
       packet->tiles[i].g = 100 + (rand() % 80);
       packet->tiles[i].b = 100 + (rand() % 80);
       if (packet->tiles[i].tile == BLOCK_FLOOR) {
-        packet->tiles[i].r += 50;
-        packet->tiles[i].g += 50;
-        packet->tiles[i].b += 50;
+        // packet->tiles[i].r += 50;
+        // packet->tiles[i].g += 50;
+        // packet->tiles[i].b += 50;
       }
       if (packet->tiles[i].tile == BLOCK_WATER) {
         packet->tiles[i].r = 120;
