@@ -10,10 +10,13 @@ typedef enum {
   UI_STATE_FIRE,
   UI_STATE_USE,
   UI_STATE_ITEM,
+  UI_STATE_AIM,
 } ui_state_e;
 
 extern int ui_rendering;
 extern int ui_state;
+extern int ui_count;
+extern char ui_previous[128];
 
 void ui_init();
 

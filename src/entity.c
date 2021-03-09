@@ -220,8 +220,10 @@ void system_renderable(entity_t *e)
 
   entity_tiles.tiles[to_index(e->position.from[0], e->position.from[1])].tile = 0;
 
-  if (!e->alive)
+  if (!e->alive) {
+    entity_tiles.tiles[to_index(e->position.to[0], e->position.to[1])].tile = 0;
     return;
+  }
   
   tile_t *tile = &entity_tiles.tiles[to_index(e->position.to[0], e->position.to[1])];
   tile->tile = e->renderable.tile;
@@ -343,12 +345,6 @@ void system_stats(entity_t *e)
   
   if (e->stats.health <= 0)
     e->alive = 0;
-
-
-  // handle death
-  if (!e->alive) {
-    
-  }
 }
 
 void system_inventory(entity_t *e)
@@ -377,15 +373,25 @@ void system_inventory(entity_t *e)
         }
       }
       if (e->ident == IDENT_PLAYER) {
-        if (e->inventory.equipt[index])
-          ui_popup(e, "YOU TAKE OFF THE THING", 255, 255, 120, 255);
-        else
-          ui_popup(e, "YOU PUT ON THE THING", 255, 255, 120, 255);
+        char buf[128];
+        if (e->inventory.equipt[index]) {
+          sprintf(buf, "YOU TAKE OFF THE %s", item_info[item].name);
+          ui_popup(e, buf, 255, 255, 120, 255);
+        } else {
+          sprintf(buf, "YOU PUT ON THE %s", item_info[item].name);
+          ui_popup(e, buf, 255, 255, 120, 255);
+        }
       }
       
       e->inventory.equipt[index] = !e->inventory.equipt[index];
     }
     
+    if (!item_info[item].identified) {
+      db_set(item);
+      char buf[128];
+      sprintf(buf, "IDENTIFIED %s", item_info[item].name);
+      ui_popup(e, buf, 255, 255, 120, 255);
+    }
     e->inventory.use = -1;
     e->energy -= ENERGY_MIN;
     return;
@@ -492,16 +498,21 @@ void action_damage(entity_t *e, int damage)
 
   ui_print("x", e->position.to[0], e->position.to[1], 255, 120, 120, 255);
 
+  // print damage
+  char buf[128];
   if (e->ident != IDENT_PLAYER) {
-    char buf[128];
-    sprintf(buf, "%s HIT FOR %i DAMAGE", e->name, damage);
+    sprintf(buf, "%s IS HIT FOR %i DAMAGE", e->name, damage);
     ui_popup(e, buf, 255, 120, 120, 255);
   }
 
   // dead
   if (e->stats.health <= 0) {
     e->alive = 0;
+    ui_reset();
     system_renderable(e);
+    ui_print("@", e->position.to[0], e->position.to[1], 255, 120, 120, 255);
+    sprintf(buf, "%s DIES", e->name);
+    ui_popup(e, buf, 255, 120, 120, 255);
   }
 
   if (e->ident == IDENT_PLAYER) {
@@ -514,6 +525,12 @@ void action_use(entity_t *e, int item)
   if (!e || !e->components.inventory)
     return;
 
+  int i = e->inventory.items[item];
+  if (i > ITEM_WAND_START && i < ITEM_WAND_END) {
+    ui_state = UI_STATE_AIM;
+    return;
+  }
+
   e->inventory.use = item; 
 }
 
@@ -523,4 +540,9 @@ void action_drop(entity_t *e, int item)
     return;
 
   e->inventory.drop = item;
+}
+
+void action_fire(entity_t *e, int item)
+{
+  
 }

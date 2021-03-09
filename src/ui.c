@@ -75,7 +75,6 @@ void ui_popup(entity_t *e, const char *str, u8 r, u8 g, u8 b, u8 a)
   ui_y = 2;
   char buf[128];
   sprintf(buf, "%s", str);
-  sprintf(ui_previous, "%s", str);
 
   if (!strcmp(buf, ui_previous)) {
     ui_count++;
@@ -83,6 +82,8 @@ void ui_popup(entity_t *e, const char *str, u8 r, u8 g, u8 b, u8 a)
   } else {
     ui_count = 0;
   }
+  
+  sprintf(ui_previous, "%s", str);
 
   int len = strlen(buf);
 
@@ -222,6 +223,15 @@ void ui_inventory(entity_t *e)
     ui_print("|", x+width, y, 100, 100, 120, 255);
 
     int item = e->inventory.items[i];
+    int tile = 0;
+    if (item > ITEM_POTION_START && item < ITEM_POTION_END)
+      tile = BLOCK_POTION;
+    if (item > ITEM_SCROLL_START && item < ITEM_SCROLL_END)
+      tile = BLOCK_SCROLL;
+    if (item > ITEM_GEAR_START && item < ITEM_GEAR_END)
+      tile = BLOCK_GEAR;
+    if (item > ITEM_WAND_START && item < ITEM_WAND_END)
+      tile = BLOCK_WAND;
     if (item == ITEM_NONE)
       continue;
 
@@ -230,6 +240,7 @@ void ui_inventory(entity_t *e)
     // item name
     sprintf(buf, "%c)%s", 'A'+i, item_info[item].name);
     ui_print(buf, x+1, y, 100, 100, 120, 255);
+    int len = strlen(buf) + 2;
     if (item > ITEM_GEAR_START) {
       sprintf(buf, "( ");
       ui_print(buf, x+width-2, y, 120, 120, 120, 255);
@@ -238,6 +249,15 @@ void ui_inventory(entity_t *e)
         ui_print(buf, x+width-1, y, 120, 255, 120, 255);
       }
     }
+
+    ui_tiles.tiles[(y*ui_tiles.w)+x+len].tile = tile;
+    if (!item_info[item].identified) {
+      ui_tiles.tiles[(y*ui_tiles.w)+x+len].tile = 43;
+      ui_tiles.tiles[(y*ui_tiles.w)+x+len].r = 160;
+    }
+    // ui_tiles.tiles[(y*ui_tiles.w)+x+len].r = 255;
+    // ui_tiles.tiles[(y*ui_tiles.w)+x+len].b = 255;
+
     y++;
   }
   ui_print("[_______________________]", x, y, 100, 100, 120, 255);
@@ -370,7 +390,7 @@ void ui_item(entity_t *e, int item)
   ui_maxlen = 0;
 
   // uses
-  if (itemid < ITEM_GEAR_START) {
+  if (itemid < ITEM_GEAR_START && item_info[itemid].identified) {
     ui_print("|                       |", x, y, 100, 100, 120, 255);
     sprintf(buf, "IT HAS %i USES LEFT", e->inventory.uses[item]);
     ui_print(buf, x+1, y++, 100, 100, 120, 255);
@@ -385,16 +405,19 @@ void ui_item(entity_t *e, int item)
     ui_print(buf, x+1, y++, 100, 100, 120, 255);
     sprintf(buf, "%i", item_info[e->inventory.items[item]].damage);
     ui_print(buf, x+10, y-1, 120, 255, 120, 255);
-  } else {
+  } else if (itemid > ITEM_GEAR_START && itemid < ITEM_GEAR_WEAPON_START) {
     ui_print("|                       |", x, y, 100, 100, 120, 255);
     sprintf(buf, "IT WOULD PROVIDE YOU");
     ui_print(buf, x+1, y++, 100, 100, 120, 255);
     ui_print("|                       |", x, y, 100, 100, 120, 255);
-    sprintf(buf, "WITH %i DEFENSE ARMOR", item_info[e->inventory.items[item]].armor);
+    sprintf(buf, "WITH %i ARMOR", item_info[e->inventory.items[item]].armor);
     ui_print(buf, x+1, y++, 100, 100, 120, 255);
     sprintf(buf, "%i", item_info[e->inventory.items[item]].armor);
     ui_print(buf, x+6, y-1, 120, 255, 120, 255);
   }
+
+  if (!item_info[itemid].identified)
+    y--;
 
   ui_print("[_>A)USE<______>B)DROP<_]", x, y, 100, 100, 120, 255);
   ui_print("A)USE", x+3, y, 120, 120, 255, 255);

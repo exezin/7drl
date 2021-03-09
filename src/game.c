@@ -26,6 +26,8 @@ int entity_index = 0;
 int use_item = 0;
 int tile_on = 0;
 
+int aim_x = 0, aim_y = 0;
+
 void (*direction_action)(entity_t*, u32, u32) = NULL;
 
 // keybinds with associated action
@@ -202,11 +204,13 @@ ERR game_init()
   inventory_add(player, ITEM_WAND_FIREBOLT, 10);
   inventory_add(player, ITEM_GEAR_CHAINHELM, 1);
   inventory_add(player, ITEM_GEAR_CHAINHELM, 1);
+  inventory_add(player, ITEM_GEAR_IRONDAGGER, 1);
+  inventory_add(player, ITEM_GEAR_IRONDAGGER, 1);
 
   generate_dungeon(dungeon_depth);
 
   // initialize the player entity
-  for (int i=0; i<10; i++) {
+  for (int i=0; i<5; i++) {
     int x, y;
     int tile = 0;
     while (tile != BLOCK_FLOOR) {
@@ -336,10 +340,10 @@ int game_run()
 
 void game_keypressed(SDL_Scancode key)
 {
-  if (ui_state != UI_STATE_ITEM)
+  if (ui_state != UI_STATE_ITEM && ui_state != UI_STATE_AIM)
     use_item = key_to_num(key);
 
-  if (key == SDL_SCANCODE_ESCAPE) {
+  if (key == SDL_SCANCODE_ESCAPE && ui_state != UI_STATE_ITEM) {
     ui_state = UI_STATE_NONE;
     ui_reset();
   }
@@ -350,11 +354,13 @@ void game_keypressed(SDL_Scancode key)
       break;
     }
     case UI_STATE_FIRE: {
+      ui_reset();
       if (player->inventory.items[use_item] > ITEM_WAND_START &&
           player->inventory.items[use_item] < ITEM_WAND_END) {
-        game_action_use_item();
+        ui_state = UI_STATE_AIM;
+        aim_x = player->position.to[0];
+        aim_y = player->position.to[1];
       }
-      ui_reset();
       break;
     }
     case UI_STATE_USE: {
@@ -365,11 +371,26 @@ void game_keypressed(SDL_Scancode key)
       break;
     }
     case UI_STATE_ITEM: {
-      if (key == SDL_SCANCODE_A)
+      if (key == SDL_SCANCODE_A) {
+        ui_reset();
         game_action_use_item();
-      if (key == SDL_SCANCODE_B)
+      } else if (key == SDL_SCANCODE_B) {
+        ui_reset();
         game_action_drop_item();
-      ui_reset();
+      } else if (key == SDL_SCANCODE_ESCAPE) {
+        game_action_inventory();
+      } else {
+        ui_reset();
+      }
+      break;
+    }
+    case UI_STATE_AIM: {
+      if (keybinds[key].action) {
+        keybinds[key].action();
+      }
+      if (key == SDL_SCANCODE_F || key == SDL_SCANCODE_SPACE || key == SDL_SCANCODE_RETURN) {
+        // fire projectile
+      }
       break;
     }
     default: {
@@ -432,7 +453,11 @@ void game_mousewheel(int dx, int dy)
 
 void game_mousemotion(int dx, int dy)
 {
+  int mx = mouse_x, my = mouse_y;
+  render_translate_mouse(&mx, &my);
 
+  aim_x = mx;
+  aim_y = my;
 }
 
 /*-----------------------------------------/
@@ -455,6 +480,32 @@ void game_render()
 
     if ((tile->tile == BLOCK_WATER || tile->tile == BLOCK_WATER_DEEP || tile->tile == BLOCK_FLOOR+1) && !(rand() % 200))
       tile->a = fov_alpha[i] - (rand() % (fov_alpha[i]/4));
+  }
+
+  if (ui_state == UI_STATE_AIM) {
+    ui_reset();
+    ui_state = UI_STATE_AIM;
+    int x = player->position.to[0], y = player->position.to[1];
+    int done = 0, distance = 0;
+    err = 999; err2=999;
+    while (!done) {
+      done = line(&x, &y, aim_x, aim_y);
+      if (!get_solid(level.tiles[(y*level.w)+x].tile) || distance > item_info[player->inventory.items[use_item]].range) {
+        aim_x = x;
+        aim_y = y;
+        break;
+      }
+
+      distance++;
+      ui_print("x", x, y, 255, 255, 0, 255);
+    }
+
+    ui_previous[0] = '\0';
+    char buf[128];
+    sprintf(buf, "AIMING %s", item_info[player->inventory.items[use_item]].name);
+    ui_popup(player, buf, 255, 255, 120, 255);
+
+    tile_on = level.tiles[(aim_y * TILES_X) + aim_x].tile;
   }
 
   ui_character(player);
@@ -481,6 +532,11 @@ void game_action_wait()
 
 void game_action_left()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_x -= 1;
+    return;
+  }
+
   if (direction_action)
     direction_action(player, player->position.from[0]-1, player->position.from[1]);
   else
@@ -492,6 +548,11 @@ void game_action_left()
 
 void game_action_right()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_x += 1;
+    return;
+  }
+
   if (direction_action)
     direction_action(player, player->position.from[0]+1, player->position.from[1]);
   else
@@ -503,6 +564,11 @@ void game_action_right()
 
 void game_action_up()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_y -= 1;
+    return;
+  }
+
   if (direction_action)
     direction_action(player, player->position.from[0], player->position.from[1]-1);
   else
@@ -514,6 +580,11 @@ void game_action_up()
 
 void game_action_down()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_y += 1;
+    return;
+  }
+
   if (direction_action)
     direction_action(player, player->position.from[0], player->position.from[1]+1);
   else
@@ -525,6 +596,12 @@ void game_action_down()
 
 void game_action_upleft()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_x -= 1;
+    aim_y -= 1;
+    return;
+  }
+
   if (direction_action)
     direction_action(player, player->position.from[0]-1, player->position.from[1]-1);
   else
@@ -536,6 +613,12 @@ void game_action_upleft()
 
 void game_action_downleft()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_x -= 1;
+    aim_y += 1;
+    return;
+  }
+
   if (direction_action)
     direction_action(player, player->position.from[0]-1, player->position.from[1]+1);
   else
@@ -547,6 +630,12 @@ void game_action_downleft()
 
 void game_action_upright()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_x += 1;
+    aim_y -= 1;
+    return;
+  }
+
   if (direction_action)
     direction_action(player, player->position.from[0]+1, player->position.from[1]-1);
   else
@@ -558,6 +647,12 @@ void game_action_upright()
 
 void game_action_downright()
 {
+  if (ui_state == UI_STATE_AIM) {
+    aim_x += 1;
+    aim_y += 1;
+    return;
+  }
+  
   if (direction_action)
     direction_action(player, player->position.from[0]+1, player->position.from[1]+1);
   else

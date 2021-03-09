@@ -57,6 +57,7 @@ typedef enum {
   ITEM_GEAR_CHAINHELM,
 
   ITEM_GEAR_WEAPON_START,
+  ITEM_GEAR_IRONDAGGER,
   ITEM_GEAR_END,
 
   ITEM_NUM
@@ -71,14 +72,22 @@ typedef enum {
   SLOT_FEET,
   SLOT_RIGHT,
   SLOT_LEFT,
+  
   SLOT_NUM
 } slot_e;
+
+typedef enum {
+  ELEMENT_FIRE,
+
+  ELEMENT_NUM
+} element_e;
 
 typedef struct {
   char description[512];
   char name[20];
   int base_uses, identified;
   int armor, damage, slot;
+  int range, element;
 } item_info_t;
 extern item_info_t item_info[ITEM_NUM];
 
@@ -141,5 +150,7 @@ static int get_solid(int tile) {
 }
 
 void db();
+
+void db_set(int item);
 
 #endif // DB_H

@@ -47,4 +47,6 @@ void game_mousewheel(int dx, int dy);
 
 void game_mousemotion(int dx, int dy);
 
+void game_action_fire();
+
 #endif // GAME_H

@@ -141,6 +141,7 @@ void action_bump(entity_t *a, entity_t *b);
 void action_damage(entity_t *e, int damage);
 void action_use(entity_t *e, int item);
 void action_drop(entity_t *e, int item);
+void action_fire(entity_t *e, int item);
 
 
 #endif // ENTITY_H
