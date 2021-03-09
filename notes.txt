@@ -1,0 +1,69 @@
+!! 7drl roadmap !!
+
+
+! day 1 !
+Work on level generation, prefabs, entity spawning etc
+Dungeons should get harder as you go deeper, cycle through Dungeons
+levels and make sure its all usable stuff
+
+! day 2 !
+Work on combat, get some inventory working with ui
+Need the ability to pick up items, equip them, and use them on enemies etc
+
+! day 3 !
+Start adding enemies and ai, work on a faction system, pulling mechanics, aggro
+Enemies should be able to fight eachother (?)
+Also work on a class/race system
+
+-> Enemies should see if there's an entity around them that they can attack
+   and perform a bump attack, dont just rely on them walking into eachother
+
+! day 4 !
+refine ui, ai, generation, get a basic game loop working
+need the ability to go down levels, win the game, restart etc
+
+! day 5 !
+Make a menu, have the ability to pick a race and class
+
+! day 6 !
+refine refine refine
+
+! day 7 !
+playtest playtest refine
+
+! day 8 !
+sleep
+
+
+! general notes !
+
+Water tiles can be animated by changing their rgb/a values right before
+rendering based on some sin/cos/time crap
+
+Perhaps draw a path to the mouse?
+
+Print out what tile/thing you are hovering over, like "you see a wall"
+Also add the ability to inspect and move the inspection tile around with keyboard
+Mouse hover is basically this mode.
+for an item it might give a description, for an enemy it would give a description, stats, perhaps what
+its wearing, if its hostile or not, its faction etc, and options to
+
+Right click opens an inventory context menu on the item you're inspecting, so you can pick an item to use
+a key might be used on a door, a dagger might be thrown at an enemy, and a spell might be cast at the target
+
+! item / inventory !
+Hover over an item (or entity) = print description
+
+Press F = Open throw/fire menu (list all throwable and fire-able items in inventory)
+    -> Chose target (either mouse or directional keys)
+
+Press R = Open usables menu (list all usable items, potions, scrolls etc)
+
+Press I = Open equipment menu (list all wearables)
+    -> Also print out character details, health, stats, etc
+
+Press P = Open drop menu (list all inventory)
+
+Press G = Open grab menu (list all items player is standing on)
+
+Press O = Open door in given direction

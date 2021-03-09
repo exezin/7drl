@@ -1,0 +1,11 @@
+{
+  "files.associations": {
+    "main.h": "c",
+    "entity.h": "c",
+    "array": "c",
+    "string_view": "c",
+    "type_traits": "c",
+    "random": "c",
+    "db.h": "c"
+  }
+}
