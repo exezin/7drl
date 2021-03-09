@@ -11,7 +11,7 @@ void db_set_desc(int item, const char *str)
 
 void db_set_name(int item, const char *str)
 {
-  strncpy(item_info[item].name, str, MIN(strlen(str), 17));
+  strncpy(item_info[item].name, str, MIN(strlen(str)+1, 18));
 }
 
 void db()
@@ -31,6 +31,7 @@ void db()
   // wand of fire bolt
   item_info[ITEM_WAND_FIREBOLT].base_uses = 10;
   item_info[ITEM_WAND_FIREBOLT].range = 10;
+  item_info[ITEM_WAND_FIREBOLT].damage = 20;
   item_info[ITEM_WAND_FIREBOLT].element = ELEMENT_FIRE;
   db_set_name(ITEM_WAND_FIREBOLT, "WAND");
   db_set_desc(ITEM_WAND_FIREBOLT, "AN UNIDENTIFIED WAND");

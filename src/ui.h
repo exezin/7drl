@@ -18,6 +18,8 @@ extern int ui_state;
 extern int ui_count;
 extern char ui_previous[128];
 
+extern tilesheet_packet_t ui_tiles;
+
 void ui_init();
 
 void ui_render();

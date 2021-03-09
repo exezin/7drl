@@ -16,7 +16,7 @@ typedef struct comp_inventory_t {
   int items[INVENTORY_MAX];
   int uses[INVENTORY_MAX];
   int equipt[INVENTORY_MAX];
-  int use, drop;
+  int use, drop, fire;
 } comp_inventory_t;
 
 typedef struct comp_stats_t {
@@ -114,6 +114,7 @@ static void comp_inventory(entity_t *e)
   memset(e->inventory.equipt, 0, sizeof(int) * INVENTORY_MAX);
   e->inventory.use = -1;
   e->inventory.drop = -1;
+  e->inventory.fire = -1;
 }
 
 void entity_new(entity_t **ret, u32 identifier, const char *name);

@@ -62,6 +62,8 @@ void main()
 
   // TODO: work around this
   if (uvc.x < 0 || uvc.x > 1.0 || uvc.y < 0 || uvc.y > 1.0)
-    color = vec4(0.0);
+    color = vec4(0.1, 0.1, 0.15, 1.0);
+
+  // 0.08, 0.04, 0.07
 }
 #END FS

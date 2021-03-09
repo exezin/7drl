@@ -355,7 +355,13 @@ void system_inventory(entity_t *e)
 
   if (e->inventory.drop > -1) {
     int index = e->inventory.drop;
+    int item = e->inventory.items[index];
 
+    char buf[128];
+    sprintf(buf, "%s DROPPED", item_info[item].name);
+    ui_popup(e, buf, 255, 255, 120, 255);
+
+    e->inventory.items[index] = 0;
     e->inventory.drop = -1;
     e->energy -= ENERGY_MIN;
     return;
@@ -392,7 +398,56 @@ void system_inventory(entity_t *e)
       sprintf(buf, "IDENTIFIED %s", item_info[item].name);
       ui_popup(e, buf, 255, 255, 120, 255);
     }
+
+    if (item > ITEM_POTION_START && item < ITEM_SCROLL_END) {
+      switch (item) {
+
+      }
+      P_DBG("A\n");
+      e->inventory.items[index] = 0;
+    }
+    
     e->inventory.use = -1;
+    e->energy -= ENERGY_MIN;
+    return;
+  }
+
+  if (e->inventory.fire > -1) {
+    int item = e->inventory.items[e->inventory.fire];
+    int entity_tile = entity_tiles.tiles[to_index(aim_x, aim_y)].tile;
+    entity_t *entity = NULL;
+    if (entity_tile)
+      entity = entity_get(aim_x, aim_y);
+    u32 ident = (entity != NULL) ? entity->ident : IDENT_UNKNOWN;
+    if (!entity || e->id == entity->id)
+      ident = IDENT_UNKNOWN;
+    switch (ident) {
+      case IDENT_PLAYER:
+      case IDENT_NPC: {
+        action_damage(entity, item_info[item].damage);
+        break;
+      }
+      case IDENT_UNKNOWN: {
+        break;
+      }
+    }
+
+    if (!item_info[item].identified) {
+      db_set(item);
+      char buf[128];
+      sprintf(buf, "IDENTIFIED %s", item_info[item].name);
+      ui_popup(e, buf, 255, 255, 120, 255);
+    }
+
+    e->inventory.uses[e->inventory.fire]--;
+    if (e->inventory.uses[e->inventory.fire] <= 0) {
+      e->inventory.items[e->inventory.fire] = 0;
+      char buf[128];
+      sprintf(buf, "%s DISSOLVES IN YOUR HANDS", item_info[item].name);
+      ui_popup(e, buf, 255, 255, 120, 255);
+    }
+
+    e->inventory.fire = -1;
     e->energy -= ENERGY_MIN;
     return;
   }
@@ -544,5 +599,8 @@ void action_drop(entity_t *e, int item)
 
 void action_fire(entity_t *e, int item)
 {
-  
+  if (!e || !e->components.inventory)
+    return;
+
+  e->inventory.fire = item;
 }

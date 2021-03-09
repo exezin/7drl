@@ -60,6 +60,7 @@ void game_action_drop_item();
 void game_action_inventory();
 void game_action_fire();
 void game_action_use();
+void game_action_shoot();
 
 
 /*-----------------------------------------/
@@ -94,12 +95,12 @@ int projectile_run()
     if (projectile_timer > 0.0f)
       return 1;
 
-    tile_t *tile = &entity_tiles.tiles[to_index(p->from[0], p->from[1])];
+    tile_t *tile = &ui_tiles.tiles[to_index(p->from[0], p->from[1])];
     tile->tile   = 0;
 
     line(&(p->from[0]), &(p->from[1]), p->to[0], p->to[1]);
 
-    tile       = &entity_tiles.tiles[to_index(p->from[0], p->from[1])];
+    tile       = &ui_tiles.tiles[to_index(p->from[0], p->from[1])];
     tile->tile = p->tile;
     tile->r    = p->r;
     tile->g    = p->g;
@@ -107,7 +108,7 @@ int projectile_run()
     tile->a    = 255;
 
     if (p->from[0] == p->to[0] && p->from[1] == p->to[1]) {
-      entity_tiles.tiles[to_index(p->from[0], p->from[1])].tile = 0;
+      ui_tiles.tiles[to_index(p->from[0], p->from[1])].tile = 0;
       p->tile = 0;
     }
 
@@ -304,11 +305,13 @@ int game_run()
       // thus causing a re-pause
       if (paused)
         break;
+
+      if (e->ident == IDENT_PLAYER)
+        player_path(player);
     }
 
-    player_path(player);
 
-    if (player->energy >= ENERGY_MIN && !player->move.dmap)
+    if (player->energy >= ENERGY_MIN && !player->move.dmap && player->inventory.fire == -1)
       paused = 1;
 
     // dec accumulator
@@ -389,7 +392,7 @@ void game_keypressed(SDL_Scancode key)
         keybinds[key].action();
       }
       if (key == SDL_SCANCODE_F || key == SDL_SCANCODE_SPACE || key == SDL_SCANCODE_RETURN) {
-        // fire projectile
+        game_action_shoot();
       }
       break;
     }
@@ -408,8 +411,6 @@ void game_mousepressed(int button)
   // translate mouse to tile coords
   int mx = mouse_x, my = mouse_y;
   render_translate_mouse(&mx, &my);
-  
-  ui_reset();
 
   // handle contextual clicks
   if (button == 3 && !ui_rendering) {
@@ -433,6 +434,10 @@ void game_mousepressed(int button)
       }
     }
   } else {
+    if (ui_state == UI_STATE_AIM) {
+      game_action_shoot();
+      return;
+    }
     int dist = MAX(abs(player->position.to[0] - mx), abs(player->position.to[1] - my));
 
     // calculate dmap to mouse
@@ -444,6 +449,7 @@ void game_mousepressed(int button)
     }
   }
   paused = 0;
+  ui_reset();
 }
 
 void game_mousewheel(int dx, int dy)
@@ -499,6 +505,7 @@ void game_render()
       distance++;
       ui_print("x", x, y, 255, 255, 0, 255);
     }
+    ui_print("x", x, y, 255, 0, 255, 255);
 
     ui_previous[0] = '\0';
     char buf[128];
@@ -689,4 +696,19 @@ void game_action_fire()
 void game_action_use()
 {
   ui_use(player);
+}
+
+void game_action_shoot()
+{
+  action_fire(player, use_item);
+  ui_reset();
+  projectile.from[0] = player->position.to[0];
+  projectile.from[1] = player->position.to[1];
+  projectile.to[0] = aim_x;
+  projectile.to[1] = aim_y;
+  projectile.tile = 68+8;
+  projectile.r = 255;
+  projectile.g = 255;
+  projectile.b = 255;
+  paused = 0;
 }

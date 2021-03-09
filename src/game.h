@@ -28,6 +28,7 @@ extern int path_to_player[], path_from_player[], path_to_mouse[];
 extern int paused;
 extern int tile_on;
 extern int dungeon_depth;
+extern int aim_x, aim_y;
 
 void projectile_start(int fromx, int fromy, int tox, int toy, int t);
 

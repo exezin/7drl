@@ -21,7 +21,7 @@
 // minimum energy required for a turn
 #define ENERGY_MIN 1.0f
 
-#define PROJECTILE_SPEED 0.01f;
+#define PROJECTILE_SPEED 0.025f;
 
 #define INVENTORY_MAX 15
 
