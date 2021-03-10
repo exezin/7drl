@@ -61,6 +61,7 @@ void game_action_inventory();
 void game_action_fire();
 void game_action_use();
 void game_action_shoot();
+void game_action_get();
 
 
 /*-----------------------------------------/
@@ -76,6 +77,7 @@ void projectile_start(int fromx, int fromy, int tox, int toy, int t)
   projectile.r = 255;
   projectile.g = 255;
   projectile.b = 255;
+  projectile.count = 0;
 
   tile_t *tile = &entity_tiles.tiles[to_index(projectile.from[0], projectile.from[1])];
   tile->tile = projectile.tile;
@@ -107,12 +109,14 @@ int projectile_run()
     tile->b    = p->b;
     tile->a    = 255;
 
-    if (p->from[0] == p->to[0] && p->from[1] == p->to[1]) {
+    if ((p->from[0] == p->to[0] && p->from[1] == p->to[1]) || p->count > 50) {
       ui_tiles.tiles[to_index(p->from[0], p->from[1])].tile = 0;
       p->tile = 0;
+      p->count = 0;
     }
 
     projectile_timer = PROJECTILE_SPEED;
+    projectile.count++;
     return 1;
   }
 
@@ -135,6 +139,12 @@ void generate_dungeon(int depth)
   comp_position(player, x, y);
   player->position.to[1] -= 1;
   action_move(player, player->position.to[0], player->position.to[1]+1);
+
+  container(ITEM_POTION_HEALING, 1, player->position.to[0], player->position.to[1]+1);
+  container(ITEM_SCROLL_MAPPING, 1, player->position.to[0], player->position.to[1]+1);
+  container(ITEM_WAND_FIREBOLT, 10, player->position.to[0], player->position.to[1]+1);
+  container(ITEM_GEAR_CHAINHELM, 1, player->position.to[0], player->position.to[1]+1);
+  container(ITEM_GEAR_IRONDAGGER, 1, player->position.to[0], player->position.to[1]+1);
 }
 
 
@@ -181,6 +191,7 @@ ERR game_init()
   keybinds[SDL_SCANCODE_I].action = &game_action_inventory;
   keybinds[SDL_SCANCODE_F].action = &game_action_fire;
   keybinds[SDL_SCANCODE_U].action = &game_action_use;
+  keybinds[SDL_SCANCODE_G].action = &game_action_get;
 
   // initialize the item db
   db();
@@ -200,13 +211,6 @@ ERR game_init()
   comp_move(player);
   comp_stats(player, 100, 1, 5);
   comp_inventory(player);
-  inventory_add(player, ITEM_POTION_HEALING, 1);
-  inventory_add(player, ITEM_SCROLL_MAPPING, 1);
-  inventory_add(player, ITEM_WAND_FIREBOLT, 10);
-  inventory_add(player, ITEM_GEAR_CHAINHELM, 1);
-  inventory_add(player, ITEM_GEAR_CHAINHELM, 1);
-  inventory_add(player, ITEM_GEAR_IRONDAGGER, 1);
-  inventory_add(player, ITEM_GEAR_IRONDAGGER, 1);
 
   generate_dungeon(dungeon_depth);
 
@@ -225,8 +229,9 @@ ERR game_init()
     comp_speed(monster, 0.5f);
     comp_move(monster);
     comp_stats(monster, 50, 1, 5);
-    // if (monster)
-      action_path(monster, path_to_player, TILES_X, TILES_Y);
+    comp_ai(monster);
+    comp_inventory(monster);
+    inventory_add(monster, ITEM_WAND_FIREBOLT, 10);
   }
  
   return SUCCESS;
@@ -261,8 +266,11 @@ int game_run()
     // do game update
     game_update(phys_delta_time, delta_time);
 
-    if (!player->alive)
-      paused = 0;
+    if (!player->alive) {
+      paused = 1;
+      ui_reset();
+      ui_dead();
+    }
 
     // handle entities
     float energy = player->energy;
@@ -274,6 +282,9 @@ int game_run()
         break;
       }
 
+      if (entity_index)
+        entity_index = 0;
+
       // update entity
       entity_t *e = entity_stack[i];
       if (!e)
@@ -283,11 +294,12 @@ int game_run()
       if (paused && !entity_index)
         break;
 
-      system_energy(e);
       system_stats(e);
-      system_move(e);
+      system_ai(e);
       system_inventory(e);
+      system_move(e);
       system_renderable(e);
+      system_energy(e);
 
       // did this entity spawn a projectile?
       if (projectile.tile) {
@@ -295,8 +307,6 @@ int game_run()
         paused = 0;
         break;
       }
-
-      entity_index = 0;
 
       if (!e->alive && e->ident != IDENT_PLAYER)
         entity_remove(e->id);
@@ -306,12 +316,13 @@ int game_run()
       if (paused)
         break;
 
-      if (e->ident == IDENT_PLAYER)
+      if (e->ident == IDENT_PLAYER) {
         player_path(player);
+        P_DBG("%f\n", player->energy);
+      }
     }
 
-
-    if (player->energy >= ENERGY_MIN && !player->move.dmap && player->inventory.fire == -1)
+    if (player->energy >= (ENERGY_MIN - 0.01f) && !player->move.dmap && player->inventory.fire == -1 && !projectile.tile)
       paused = 1;
 
     // dec accumulator
@@ -381,6 +392,7 @@ void game_keypressed(SDL_Scancode key)
         ui_reset();
         game_action_drop_item();
       } else if (key == SDL_SCANCODE_ESCAPE) {
+        ui_reset();
         game_action_inventory();
       } else {
         ui_reset();
@@ -700,7 +712,7 @@ void game_action_use()
 
 void game_action_shoot()
 {
-  action_fire(player, use_item);
+  action_fire(player, use_item, aim_x, aim_y);
   ui_reset();
   projectile.from[0] = player->position.to[0];
   projectile.from[1] = player->position.to[1];
@@ -708,7 +720,13 @@ void game_action_shoot()
   projectile.to[1] = aim_y;
   projectile.tile = 68+8;
   projectile.r = 255;
-  projectile.g = 255;
+  projectile.g = 120;
   projectile.b = 255;
+  paused = 0;
+}
+
+void game_action_get()
+{
+  action_get(player);
   paused = 0;
 }

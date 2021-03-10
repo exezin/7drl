@@ -457,7 +457,7 @@ void ui_character(entity_t *e)
   ui_print(buf, (TILES_X/2)-strlen(buf)/2, 0, 100, 100, 120, 255);
 
   // health
-  sprintf(buf, ">,%i/%i,<", e->stats.health, e->stats.max_health);
+  sprintf(buf, ">,%i/%i,<", MAX(e->stats.health, 0), e->stats.max_health);
   ui_print(buf, (TILES_X/2)-strlen(buf)/2, TILES_Y, 100, 100, 120, 255);
 
   // health
@@ -484,6 +484,15 @@ void ui_character(entity_t *e)
     }
     ui_print(buf, 1, TILES_Y, 100, 100, 120, 255);
   }
+}
+
+void ui_dead()
+{
+  char buf[128];
+  sprintf(buf, "YOU HAVE DIED ON LEVEL %i", dungeon_depth);
+  ui_print(buf, (TILES_X/2)-strlen(buf)/2, (TILES_Y/2)-2, 255, 120, 120, 255);
+  sprintf(buf, "PRESS Q TO RETURN TO THE MENU");
+  ui_print(buf, (TILES_X/2)-strlen(buf)/2, (TILES_Y/2)-1, 255, 120, 120, 255);
 }
 
 void ui_reset()

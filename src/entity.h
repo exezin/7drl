@@ -12,12 +12,21 @@
 extern u8 level_alpha[TILES_NUM];
 extern u8 fov_alpha[TILES_NUM];
 
+typedef struct comp_ai_t {
+  int aggro, target;
+} comp_ai_t;
+
 typedef struct comp_inventory_t {
   int items[INVENTORY_MAX];
   int uses[INVENTORY_MAX];
   int equipt[INVENTORY_MAX];
-  int use, drop, fire;
+  int use, drop, fire, get;
+  int fire_x, fire_y;
 } comp_inventory_t;
+
+typedef struct comp_container_t {
+  int item, uses;
+} comp_container_t;
 
 typedef struct comp_stats_t {
   int health, max_health;
@@ -52,6 +61,8 @@ typedef struct {
   u32 move       : 1;
   u32 stats      : 1;
   u32 inventory  : 1;
+  u32 container  : 1;
+  u32 ai         : 1;
 } comp_flags_t;
 
 typedef struct {
@@ -70,6 +81,8 @@ typedef struct {
   comp_move_t       move;
   comp_stats_t      stats;
   comp_inventory_t  inventory;
+  comp_container_t  container;
+  comp_ai_t         ai;
 } entity_t;
 
 extern entity_t *entity_stack[ENTITY_STACK_MAX];
@@ -112,9 +125,37 @@ static void comp_inventory(entity_t *e)
   memset(e->inventory.items, ITEM_NONE, sizeof(int) * INVENTORY_MAX);
   memset(e->inventory.uses, 0, sizeof(int) * INVENTORY_MAX);
   memset(e->inventory.equipt, 0, sizeof(int) * INVENTORY_MAX);
-  e->inventory.use = -1;
+  e->inventory.use  = -1;
   e->inventory.drop = -1;
   e->inventory.fire = -1;
+  e->inventory.get  = -1;
+}
+static void comp_container(entity_t *e, int item, int uses, int x, int y)
+{
+  int tile = 0;
+  if (item > ITEM_POTION_START && item < ITEM_POTION_END)
+    tile = BLOCK_POTION;
+  if (item > ITEM_SCROLL_START && item < ITEM_SCROLL_END)
+    tile = BLOCK_SCROLL;
+  if (item > ITEM_GEAR_START && item < ITEM_GEAR_WEAPON_START)
+    tile = BLOCK_GEAR;
+  if (item > ITEM_GEAR_WEAPON_START && item < ITEM_GEAR_END)
+    tile = BLOCK_SWORD;
+  if (item > ITEM_WAND_START && item < ITEM_WAND_END)
+    tile = BLOCK_WAND;
+  if (item == ITEM_NONE)
+    return;
+  comp_renderable(e, tile, 255, 120, 255, 255);
+  comp_position(e, x, y);
+  e->components.container = 1;
+  e->container.item = item;
+  e->container.uses = uses;
+}
+static void comp_ai(entity_t *e)
+{
+  e->components.ai = 1;
+  memset(&e->ai, 0, sizeof(comp_ai_t));
+  e->ai.target = -1;
 }
 
 void entity_new(entity_t **ret, u32 identifier, const char *name);
@@ -126,12 +167,15 @@ void dijkstra(int *arr, int tox, int toy, int w, int h);
 int dijkstra_lowest(vec2 out, int *arr, int tilex, int tiley, int w, int h);
 int inventory_add(entity_t *e, int item, int uses);
 void player_path(entity_t *e);
+void container(int item, int uses, int x, int y);
+
 
 void system_move(entity_t *e);
 void system_renderable(entity_t *e);
 void system_energy(entity_t *e);
 void system_stats(entity_t *e);
 void system_inventory(entity_t *e);
+void system_ai(entity_t *e);
 
 
 void action_move(entity_t *e, u32 x, u32 y);
@@ -139,10 +183,11 @@ void action_path(entity_t *e, int *path, u32 w, u32 h);
 void action_stop(entity_t *e);
 void action_open(entity_t *e, u32 x, u32 y);
 void action_bump(entity_t *a, entity_t *b);
-void action_damage(entity_t *e, int damage);
+void action_damage(entity_t *a, entity_t *b, int damage);
 void action_use(entity_t *e, int item);
 void action_drop(entity_t *e, int item);
-void action_fire(entity_t *e, int item);
+void action_fire(entity_t *e, int item, int x, int y);
+void action_get(entity_t *e);
 
 
 #endif // ENTITY_H

@@ -21,7 +21,7 @@
 // minimum energy required for a turn
 #define ENERGY_MIN 1.0f
 
-#define PROJECTILE_SPEED 0.025f;
+#define PROJECTILE_SPEED 0.035f;
 
 #define INVENTORY_MAX 15
 
@@ -141,6 +141,7 @@ static int get_solid(int tile) {
   switch (tile) {
     case BLOCK_NONE:
     case BLOCK_WALL_V:
+    case BLOCK_DOOR:
     case BLOCK_WALL: {
       return 0;
     }

@@ -63,7 +63,9 @@ void dijkstra(int *arr, int tox, int toy, int w, int h)
         u32 index = (y * w) + x;
         int tile = level.tiles[index].tile;
         arr[index] = get_walkable(tile) ? DIJ_MAX : -(DIJ_MAX+1);
-        if (entity_get(x, y))
+        entity_t *e = entity_get(x, y);
+        int ident = e ? e->ident : IDENT_UNKNOWN;
+        if (ident == IDENT_PLAYER || ident == IDENT_NPC)
           arr[index] = -(DIJ_MAX+1);
 
         if (x == tox && y == toy) {
@@ -151,7 +153,7 @@ void fov(entity_t *e)
     float tox = CLAMP(fromx + 0.5f + ((float)distance * cos(f)), 0, level.w-1);
     float toy = CLAMP(fromy + 0.5f + ((float)distance * sin(f)), 0, level.h-1);
 
-    int x = (int)fromx, y = (int)fromy, done = 0;
+    int x = (int)fromx, y = (int)fromy, done = 0, distance = 0;
     while (!done) {
       done = line(&x, &y, (int)tox, (int)toy);
       x = CLAMP(x, 0, level.w-1);
@@ -172,9 +174,11 @@ void fov(entity_t *e)
         level_alpha[(ty * level.w) + tx] = 50.0f;
       }
 
-      if (!get_solid(tile->tile) || tile->tile == BLOCK_DOOR) {
+      if (!get_solid(tile->tile) || tile->tile == BLOCK_DOOR || distance > 50) {
         break;
       }
+
+      distance++;
     }
   }
 }
@@ -210,6 +214,13 @@ void player_path(entity_t *e)
   fov(e);
 }
 
+void container(int item, int uses, int x, int y)
+{
+  entity_t *e;
+  entity_new(&e, IDENT_CONTAINER, "A BAG");
+  comp_container(e, item, uses, x, y);
+}
+
 /*-----------------------------------------/
 /---------------- SYSTEMS -----------------/
 /-----------------------------------------*/
@@ -217,6 +228,13 @@ void system_renderable(entity_t *e)
 {
   if (!e->components.renderable || !e->components.position)
     return;
+
+  if (e->ident == IDENT_CONTAINER) {
+    entity_t *on = entity_get(e->position.to[0], e->position.to[1]);
+    int ident = on ? on->ident : IDENT_UNKNOWN;
+    if (ident == IDENT_PLAYER || ident == IDENT_NPC)
+      return;
+  }
 
   entity_tiles.tiles[to_index(e->position.from[0], e->position.from[1])].tile = 0;
 
@@ -259,7 +277,7 @@ void system_move(entity_t *e)
     to[0] = e->move.target[0]; to[1] = e->move.target[1];
   } else if (e->move.dmap) {
     vec2 out;
-    int d = dijkstra_lowest(out, e->move.dmap, e->position.to[0], e->position.to[1], e->move.w, e->move.h);
+    int d = dijkstra_lowest(out, e->move.dmap, e->position.to[0], e->position.to[1], TILES_X, TILES_Y);
     if (d < DIJ_MAX) {
       to[0] = out[0];
       to[1] = out[1];
@@ -289,10 +307,10 @@ void system_move(entity_t *e)
     // do bump attack
     case IDENT_PLAYER:
     case IDENT_NPC: {
-      if (e->ident != entity->ident)
+      if (e->ident != entity->ident && e->ident != IDENT_NPC)
         action_bump(e, entity);
       action_stop(e);
-      e->energy -= ENERGY_MIN;
+      e->energy = 0;;
       return;
     }
     case IDENT_UNKNOWN: {
@@ -325,7 +343,7 @@ void system_move(entity_t *e)
     default: {
       e->position.to[0] = to[0];
       e->position.to[1] = to[1];
-      e->energy -= ENERGY_MIN;
+      e->energy = 0;
       break;
     }
   }
@@ -352,6 +370,36 @@ void system_inventory(entity_t *e)
   if (!e->components.inventory || e->energy < ENERGY_MIN)
     return;
 
+  if (e->inventory.get > -1) {
+    entity_t *on = NULL;
+    for (int i=0; i<ENTITY_STACK_MAX; i++) {
+      entity_t *ent = entity_stack[i];
+
+      if (!ent || !ent->alive || !ent->components.position)
+        continue;
+
+      if (ent->position.to[0] == e->position.to[0] && ent->position.to[1] == e->position.to[1] && ent->ident == IDENT_CONTAINER) {
+        on = ent;
+        break;
+      }
+    }
+    int ident = on ? on->ident : IDENT_UNKNOWN;
+    if (ident == IDENT_CONTAINER) {
+      int added = inventory_add(e, on->container.item, on->container.uses);
+        P_DBG("Get!\n");
+      if (added) {
+        char buf[128];
+        sprintf(buf, "PICKED UP %s", item_info[on->container.item].name);
+        ui_popup(e, buf, 255, 255, 120, 255);
+        on->alive = 0;
+      } else {
+        ui_popup(e, "INVENTORY FULL", 255, 255, 120, 255);
+      }
+    }
+    e->inventory.get = -1;
+    e->energy = 0;;
+    return;
+  }
 
   if (e->inventory.drop > -1) {
     int index = e->inventory.drop;
@@ -361,9 +409,11 @@ void system_inventory(entity_t *e)
     sprintf(buf, "%s DROPPED", item_info[item].name);
     ui_popup(e, buf, 255, 255, 120, 255);
 
+    container(item, e->inventory.uses[index], e->position.to[0], e->position.to[1]);
+
     e->inventory.items[index] = 0;
     e->inventory.drop = -1;
-    e->energy -= ENERGY_MIN;
+    e->energy = 0;;
     return;
   }
 
@@ -392,7 +442,7 @@ void system_inventory(entity_t *e)
       e->inventory.equipt[index] = !e->inventory.equipt[index];
     }
     
-    if (!item_info[item].identified) {
+    if (!item_info[item].identified && e->ident == IDENT_PLAYER) {
       db_set(item);
       char buf[128];
       sprintf(buf, "IDENTIFIED %s", item_info[item].name);
@@ -408,23 +458,31 @@ void system_inventory(entity_t *e)
     }
     
     e->inventory.use = -1;
-    e->energy -= ENERGY_MIN;
+    e->energy = 0;;
     return;
   }
 
   if (e->inventory.fire > -1) {
     int item = e->inventory.items[e->inventory.fire];
-    int entity_tile = entity_tiles.tiles[to_index(aim_x, aim_y)].tile;
     entity_t *entity = NULL;
-    if (entity_tile)
-      entity = entity_get(aim_x, aim_y);
+    for (int i=0; i<ENTITY_STACK_MAX; i++) {
+      entity_t *ent = entity_stack[i];
+
+      if (!ent || !ent->alive || !ent->components.position)
+        continue;
+
+      if (ent->position.to[0] == e->inventory.fire_x && ent->position.to[1] == e->inventory.fire_y && ent->ident != IDENT_CONTAINER) {
+        entity = ent;
+        break;
+      }
+    }
     u32 ident = (entity != NULL) ? entity->ident : IDENT_UNKNOWN;
     if (!entity || e->id == entity->id)
       ident = IDENT_UNKNOWN;
     switch (ident) {
       case IDENT_PLAYER:
       case IDENT_NPC: {
-        action_damage(entity, item_info[item].damage);
+        action_damage(e, entity, item_info[item].damage);
         break;
       }
       case IDENT_UNKNOWN: {
@@ -432,7 +490,7 @@ void system_inventory(entity_t *e)
       }
     }
 
-    if (!item_info[item].identified) {
+    if (e->ident == IDENT_PLAYER && !item_info[item].identified) {
       db_set(item);
       char buf[128];
       sprintf(buf, "IDENTIFIED %s", item_info[item].name);
@@ -442,15 +500,127 @@ void system_inventory(entity_t *e)
     e->inventory.uses[e->inventory.fire]--;
     if (e->inventory.uses[e->inventory.fire] <= 0) {
       e->inventory.items[e->inventory.fire] = 0;
-      char buf[128];
-      sprintf(buf, "%s DISSOLVES IN YOUR HANDS", item_info[item].name);
-      ui_popup(e, buf, 255, 255, 120, 255);
+      if (e->ident == IDENT_PLAYER) {
+        char buf[128];
+        sprintf(buf, "%s DISSOLVES IN YOUR HANDS", item_info[item].name);
+        ui_popup(e, buf, 255, 255, 120, 255);
+      }
     }
 
     e->inventory.fire = -1;
-    e->energy -= ENERGY_MIN;
+    e->energy = 0;
     return;
   }
+}
+
+void system_ai(entity_t *e)
+{
+  if (!e || !e->components.ai || e->energy < ENERGY_MIN)
+    return;
+
+  // do wander
+  if (!e->ai.aggro) {
+    int dx = (-1 + (rand() % 3)) + e->position.to[0];
+    int dy = (-1 + (rand() % 3)) + e->position.to[1];
+    int tile = level.tiles[(dy * level.w) + dx].tile;
+    if (!(rand() % 2) && get_solid(tile)) {
+      e->move.target[0] = dx;
+      e->move.target[1] = dy;
+    }
+    e->move.dmap = NULL;
+    return;
+  }
+
+  if (e->ai.target < 0)
+    return;
+
+  entity_t *target = entity_stack[e->ai.target];
+  if (!target)
+    return;
+
+  int dist_x = abs(e->position.to[0] - target->position.to[0]);
+  int dist_y = abs(e->position.to[1] - target->position.to[1]);
+
+  // do flee
+  float hp = ((float)e->stats.health / e->stats.max_health);
+  if (hp <= 0.3f) {
+    if (target->ident == IDENT_PLAYER) {
+      e->move.dmap = path_from_player;
+
+      if (dist_x < 2 && dist_y < 2 && !(rand() % 2)) {
+        action_bump(e, target);
+        e->energy = 0;
+      }
+    }
+    return;
+  }
+
+  // see if target is visible
+  int done = 0;
+  int distance = 0, x = e->position.to[0], y = e->position.to[1];
+  while (!done) {
+    done = line(&x, &y, target->position.to[0], target->position.to[1]);
+    if (!get_solid(level.tiles[(y*level.w)+x].tile) || distance > 30) {
+      e->inventory.fire_x = x;
+      e->inventory.fire_x = y;
+      break;
+    }
+
+    distance++;
+  }
+  
+  int item = ITEM_NONE;
+  int itemindex = -1;
+  if (x == target->position.to[0] && y == target->position.to[1]) {
+    // visible, attempt ranged
+    // determine if we have a ranged weapon
+    if (e->components.inventory) {
+      for (int i=0; i<INVENTORY_MAX; i++) {
+        int weapon = e->inventory.items[i];
+
+        if (weapon > ITEM_WAND_START && weapon < ITEM_WAND_END) {
+          item = weapon;
+          itemindex = i;
+          break;
+        }
+      }
+    }
+
+    int range = item_info[item].range;
+
+    // fire projectile
+    if (item != ITEM_NONE && distance <= range && distance > 2) {
+      action_fire(e, itemindex, target->position.to[0], target->position.to[1]);
+      projectile.from[0] = e->position.to[0];
+      projectile.from[1] = e->position.to[1];
+      projectile.to[0] = target->position.to[0];
+      projectile.to[1] = target->position.to[1];
+      projectile.tile = 68+8;
+      projectile.r = 255;
+      projectile.g = 120;
+      projectile.b = 255;
+    } else {
+      if (dist_x < 2 && dist_y < 2 && e->speed.speed < (target->speed.speed - 0.01f)) {
+        // do bump attack
+        action_bump(e, target);
+        e->energy = 0;
+      } else {
+        // do chase
+        if (target->ident == IDENT_PLAYER) {
+          e->move.dmap = path_to_player;
+          e->move.target[0] = e->position.to[0];
+          e->move.target[1] = e->position.to[1];
+          if (item != ITEM_NONE && dist_x <= 2 && dist_y <= 2)
+            e->move.dmap = path_from_player;
+        }
+      }
+    }
+  } else {
+    e->move.dmap = path_to_player;
+    e->move.target[0] = e->position.to[0];
+    e->move.target[1] = e->position.to[1];
+  }
+    
 }
 
 
@@ -503,12 +673,12 @@ void action_open(entity_t *e, u32 x, u32 y)
   switch (tile->tile) {
     case BLOCK_DOOR: {
       tile->tile = BLOCK_DOOR_OPEN;
-      e->energy -= ENERGY_MIN;
+      e->energy = 0;;
       break;
     }
     case BLOCK_DOOR_OPEN: {
       tile->tile = BLOCK_DOOR;
-      e->energy -= ENERGY_MIN;
+      e->energy = 0;;
       break;
     }
   }
@@ -530,48 +700,53 @@ void action_bump(entity_t *a, entity_t *b)
 
   int damage = a->stats.base_damage + weapon;
 
-  action_damage(b, damage);
+  action_damage(a, b, damage);
 }
 
-void action_damage(entity_t *e, int damage)
+void action_damage(entity_t *a, entity_t *b, int damage)
 {
-  if (!e || !e->components.stats)
+  if (!b || !b->components.stats)
     return;
 
   int defense = 0;
-  if (e->components.inventory) {
+  if (b->components.inventory) {
     for (int i=0; i<INVENTORY_MAX; i++) {
-      if (e->inventory.equipt[i] && e->inventory.items[i] > ITEM_GEAR_START) {
-        defense += item_info[e->inventory.items[i]].armor;
+      if (b->inventory.equipt[i] && b->inventory.items[i] > ITEM_GEAR_START) {
+        defense += item_info[b->inventory.items[i]].armor;
       }
     }
   }
 
   damage = MAX(1, damage - defense);
 
-  e->stats.health -= damage;
+  b->stats.health -= damage;
 
-  ui_print("x", e->position.to[0], e->position.to[1], 255, 120, 120, 255);
+  ui_print("x", b->position.to[0], b->position.to[1], 255, 120, 120, 255);
+
+  if (b->components.ai) {
+    b->ai.aggro  = 1;
+    b->ai.target = a->id;
+  }
 
   // print damage
   char buf[128];
-  if (e->ident != IDENT_PLAYER) {
-    sprintf(buf, "%s IS HIT FOR %i DAMAGE", e->name, damage);
-    ui_popup(e, buf, 255, 120, 120, 255);
+  if (b->ident != IDENT_PLAYER) {
+    sprintf(buf, "%s IS HIT FOR %i DAMAGE", b->name, damage);
+    ui_popup(b, buf, 255, 120, 120, 255);
   }
 
   // dead
-  if (e->stats.health <= 0) {
-    e->alive = 0;
+  if (b->stats.health <= 0) {
+    b->alive = 0;
     ui_reset();
-    system_renderable(e);
-    ui_print("@", e->position.to[0], e->position.to[1], 255, 120, 120, 255);
-    sprintf(buf, "%s DIES", e->name);
-    ui_popup(e, buf, 255, 120, 120, 255);
+    system_renderable(b);
+    ui_print("@", b->position.to[0], b->position.to[1], 255, 120, 120, 255);
+    sprintf(buf, "%s DIES", b->name);
+    ui_popup(b, buf, 255, 120, 120, 255);
   }
 
-  if (e->ident == IDENT_PLAYER) {
-    action_stop(e);
+  if (b->ident == IDENT_PLAYER) {
+    action_stop(b);
   }
 }
 
@@ -586,7 +761,7 @@ void action_use(entity_t *e, int item)
     return;
   }
 
-  e->inventory.use = item; 
+  e->inventory.use = item;
 }
 
 void action_drop(entity_t *e, int item)
@@ -597,10 +772,20 @@ void action_drop(entity_t *e, int item)
   e->inventory.drop = item;
 }
 
-void action_fire(entity_t *e, int item)
+void action_fire(entity_t *e, int item, int x, int y)
 {
   if (!e || !e->components.inventory)
     return;
 
   e->inventory.fire = item;
+  e->inventory.fire_x = x;
+  e->inventory.fire_y = y;
+}
+
+void action_get(entity_t *e)
+{
+  if (!e || !e->components.inventory)
+    return;
+
+  e->inventory.get = 1;
 }

@@ -17,7 +17,7 @@ typedef enum {
 
 typedef struct {
   int from[2], to[2];
-  int tile;
+  int tile, count;
   u8 r, g, b;
 } projectile_t;
 
