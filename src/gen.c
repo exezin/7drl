@@ -339,8 +339,10 @@ void place_halls(slice_t *slice, u32 chance)
         for (int i=0; i<10; i++) {
           if (get_tile(slice, x1, y1)->block == BLOCK_FLOOR || i == 9) {
             get_tile(slice, x1, y1)->block = BLOCK_FLOOR;
-            get_tile(slice, x1-dx, y1-dy)->block = BLOCK_DOOR;
             get_tile(slice, x1-dx, y1-dy)->room_id = id;
+            if (!(rand() % chance)) {
+              get_tile(slice, x1-dx, y1-dy)->block = BLOCK_DOOR;
+            }
             break;
           }
           get_tile(slice, x1, y1)->block = BLOCK_FLOOR;
@@ -595,16 +597,34 @@ void place_prefab(slice_t *slice, prefab_t *prefab)
   P_DBG("Found room %i\n", room_id);
 }
 
-void gen(tilesheet_packet_t *packet)
+void place_exit(slice_t *slice)
+{
+  int done = 0;
+  while (!done) {
+    int x = rand() % slice->width;
+    int y = rand() % slice->height;
+    int tile = get_tile(slice, x, y)->block;
+    if (tile == BLOCK_FLOOR) {
+      get_tile(slice, x, y)->block = BLOCK_STAIRS;
+      return;
+    }
+  }
+}
+
+void gen(tilesheet_packet_t *packet, int depth)
 {
   // create initial empty map
   max_width = (WINDOW_WIDTH / TILE_RWIDTH) - 2;
   max_height = (WINDOW_HEIGHT / TILE_RHEIGHT) - 2;
   slice_t map = new_slice_sized(max_width, max_height);
 
+  depth += 1;
+  int cavern = ((5 - (5 / (depth + 1)))) + 1;
+  P_DBG("Cavern %i\n", cavern);
+
   // initial room (placed in center)
   slice_t slice = new_slice();
-  place_cave(&slice, 18 + rand() % 13);
+  place_cave(&slice, 18 + rand() % (13 + cavern / 2));
   clean_slice(&slice);
   compress_slice(&slice);
   slice_set_id(&slice, map.room_count++);
@@ -636,15 +656,18 @@ void gen(tilesheet_packet_t *packet)
         slice = new_slice();
       }
     }
-    if (!(rand() % 3)) {
-      destroy_slice(&room_parts);
-      room_parts = new_slice();
-      place_cave(&slice, 12 + rand() % 5);
-      clean_slice(&slice);
-      compress_slice(&slice);
-      place_slice(&room_parts, &slice);
-      destroy_slice(&slice);
-      slice = new_slice();
+    for (int i=0; i<MIN(1, cavern-5); i++) {
+      if (!(rand() % 3)) {
+        destroy_slice(&room_parts);
+        room_parts = new_slice();
+        place_cave(&slice, 12 + (rand() % (5 + cavern)));
+        clean_slice(&slice);
+        compress_slice(&slice);
+        place_slice(&room_parts, &slice);
+        destroy_slice(&slice);
+        slice = new_slice();
+        break;
+      }
     }
 
     clean_slice(&room_parts);
@@ -671,18 +694,29 @@ void gen(tilesheet_packet_t *packet)
     destroy_slice(&room_parts);
   }
 
-
-  place_doors(&map, 1);
-  place_halls(&map, 1);
+  if (depth < 5) {
+    place_doors(&map, MAX(1, depth-1));
+    place_halls(&map, MAX(1, depth/2));
+  } else {
+    place_halls(&map, 9999);
+  }
   clean_dungeon(&map);
   place_lake(&map);
   place_lake(&map);
 
+  for (int i=0; i<MAX(0, depth); i++) {
+    place_lake(&map);
+  }
+
   // do prefabs
   place_prefab(&map, &prefab_treasure);
 
+  // do exit and spawn
+  place_exit(&map);
+
   slice_t real_map = new_slice_sized(max_width + 2, max_height + 2);
   place_slice(&real_map, &map);
+
 
   // generate tilemap packet
   packet->x = 0, packet->y = 0;
@@ -698,7 +732,8 @@ void gen(tilesheet_packet_t *packet)
       u32 i = (y * packet->w) + x;
       u32 i2 = (y * packet->w) + x;
       packet->tiles[i].tile = real_map.tiles[i].block;
-      if (packet->tiles[i].tile == BLOCK_FLOOR && rand() % 20 < 5)
+      int grass = MAX(2, 4 * (4 - depth));
+      if (packet->tiles[i].tile == BLOCK_FLOOR && !(rand() % grass))
         packet->tiles[i].tile++;
       switch (packet->tiles[i].tile) {
         case BLOCK_WALL: {
@@ -725,10 +760,15 @@ void gen(tilesheet_packet_t *packet)
         packet->tiles[i].g = 50;
         packet->tiles[i].b = 150;
       }
+      if (packet->tiles[i].tile == BLOCK_STAIRS) {
+        packet->tiles[i].r = 255;
+        packet->tiles[i].g = 120;
+        packet->tiles[i].b = 255;
+      }
       packet->tiles[i].a = 255;
     }
   }
-  print_slice(&map);
+  // print_slice(&map);
 
   free(map.tiles);
 }

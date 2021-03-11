@@ -442,18 +442,40 @@ void system_inventory(entity_t *e)
       e->inventory.equipt[index] = !e->inventory.equipt[index];
     }
     
+    int new = 0;
     if (!item_info[item].identified && e->ident == IDENT_PLAYER) {
       db_set(item);
       char buf[128];
       sprintf(buf, "IDENTIFIED %s", item_info[item].name);
       ui_popup(e, buf, 255, 255, 120, 255);
+      new = 1;
     }
 
     if (item > ITEM_POTION_START && item < ITEM_SCROLL_END) {
+      /* -----
+      DO ITEM SPECIFIC THING
+      -------- */
       switch (item) {
-
+        case ITEM_POTION_HEALING: {
+          e->stats.health = MIN(e->stats.health + 10, e->stats.max_health);
+          break;
+        }
+        case ITEM_SCROLL_MAPPING: {
+          magic_mapping = 1;
+          break;
+        }
       }
-      P_DBG("A\n");
+      if (!new) {
+        if (item > ITEM_POTION_START && item < ITEM_POTION_END) {
+          char buf[128];
+          sprintf(buf, "YOU CONSUME %s", item_info[item].name);
+          ui_popup(e, buf, 255, 255, 120, 255);
+        } else {
+          char buf[128];
+          sprintf(buf, "YOU READ %s", item_info[item].name);
+          ui_popup(e, buf, 255, 255, 120, 255);
+        }
+      }
       e->inventory.items[index] = 0;
     }
     
@@ -523,7 +545,7 @@ void system_ai(entity_t *e)
     int dx = (-1 + (rand() % 3)) + e->position.to[0];
     int dy = (-1 + (rand() % 3)) + e->position.to[1];
     int tile = level.tiles[(dy * level.w) + dx].tile;
-    if (!(rand() % 2) && get_solid(tile)) {
+    if (get_solid(tile) && !(rand() % 2)) {
       e->move.target[0] = dx;
       e->move.target[1] = dy;
     }
@@ -558,6 +580,7 @@ void system_ai(entity_t *e)
   // see if target is visible
   int done = 0;
   int distance = 0, x = e->position.to[0], y = e->position.to[1];
+  err = 999; err2=999;
   while (!done) {
     done = line(&x, &y, target->position.to[0], target->position.to[1]);
     if (!get_solid(level.tiles[(y*level.w)+x].tile) || distance > 30) {

@@ -168,6 +168,7 @@ int dijkstra_lowest(vec2 out, int *arr, int tilex, int tiley, int w, int h);
 int inventory_add(entity_t *e, int item, int uses);
 void player_path(entity_t *e);
 void container(int item, int uses, int x, int y);
+void fov(entity_t *e);
 
 
 void system_move(entity_t *e);

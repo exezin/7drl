@@ -108,6 +108,7 @@ typedef enum {
   BLOCK_SCROLL,
   BLOCK_WAND,
   BLOCK_GEAR,
+  BLOCK_STAIRS = 62,
 
   BLOCK_NUM
 } block_e;

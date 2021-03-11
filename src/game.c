@@ -14,6 +14,9 @@ static double delta_time, accumulator = 0.0;
 static double last_frame_time = 0.0;
 double game_tick = 0.0;
 
+double mapping_timer = 0.1f;
+int magic_mapping = 0;
+
 // set to zero when the player wants to take a turn
 // set to one when the player has sufficient energy to take a turn
 int paused = 0;
@@ -62,6 +65,8 @@ void game_action_fire();
 void game_action_use();
 void game_action_shoot();
 void game_action_get();
+void game_action_stairs();
+void game_action_restart();
 
 
 /*-----------------------------------------/
@@ -123,10 +128,38 @@ int projectile_run()
   return 0;
 }
 
-void generate_dungeon(int depth)
+void generate_dungeon(int depth, int reset)
 {
+  for (int i=1; i<ENTITY_STACK_MAX; i++) {
+    entity_t *e = entity_stack[i];
+    if (e) {
+      entity_remove(i);
+      entity_stack[i] = NULL;
+    }
+  }
+
+  magic_mapping = 0;
+
+  // initialize the player entity
+  if (reset) { 
+    if (player)
+      entity_remove(player->id);
+    entity_new(&player, IDENT_PLAYER, "PLAYER");
+    comp_renderable(player, 38, 255, 255, 255, 255);
+    comp_speed(player, 1.0f);
+    comp_move(player);
+    comp_stats(player, 100, 1, 5);
+    comp_inventory(player);
+  }
+
+  memset(level.tiles, 0, sizeof(tile_t) * level.w * level.h);
+  memset(ui_tiles.tiles, 0, sizeof(tile_t) * ui_tiles.w * ui_tiles.h);
+  memset(entity_tiles.tiles, 0, sizeof(tile_t) * entity_tiles.w * entity_tiles.h);
+  memset(level_alpha, 0, TILES_NUM);
+  memset(fov_alpha, 0, TILES_NUM);
+
   // generate the dungeon
-  gen(&level);
+  gen(&level, dungeon_depth);
 
   // move the player into position
   int x, y;
@@ -137,14 +170,14 @@ void generate_dungeon(int depth)
     tile = level.tiles[(y * level.w) + x].tile;
   }
   comp_position(player, x, y);
-  player->position.to[1] -= 1;
-  action_move(player, player->position.to[0], player->position.to[1]+1);
+  fov(player);
+  system_renderable(player);
 
-  container(ITEM_POTION_HEALING, 1, player->position.to[0], player->position.to[1]+1);
-  container(ITEM_SCROLL_MAPPING, 1, player->position.to[0], player->position.to[1]+1);
-  container(ITEM_WAND_FIREBOLT, 10, player->position.to[0], player->position.to[1]+1);
-  container(ITEM_GEAR_CHAINHELM, 1, player->position.to[0], player->position.to[1]+1);
-  container(ITEM_GEAR_IRONDAGGER, 1, player->position.to[0], player->position.to[1]+1);
+  container(ITEM_POTION_HEALING, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_SCROLL_MAPPING, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_WAND_FIREBOLT, 10, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_CHAINHELM, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_IRONDAGGER, 1, player->position.to[0], player->position.to[1]);
 }
 
 
@@ -192,6 +225,7 @@ ERR game_init()
   keybinds[SDL_SCANCODE_F].action = &game_action_fire;
   keybinds[SDL_SCANCODE_U].action = &game_action_use;
   keybinds[SDL_SCANCODE_G].action = &game_action_get;
+  keybinds[SDL_SCANCODE_SPACE].action = &game_action_stairs;
 
   // initialize the item db
   db();
@@ -204,15 +238,7 @@ ERR game_init()
   entity_tiles.ry = 0, entity_tiles.rh = entity_tiles.h;
   entity_tiles.tiles = calloc(1, sizeof(tile_t) * entity_tiles.w * entity_tiles.h);
 
-  // initialize the player entity
-  entity_new(&player, IDENT_PLAYER, "PLAYER");
-  comp_renderable(player, 38, 255, 255, 255, 255);
-  comp_speed(player, 1.0f);
-  comp_move(player);
-  comp_stats(player, 100, 1, 5);
-  comp_inventory(player);
-
-  generate_dungeon(dungeon_depth);
+  generate_dungeon(dungeon_depth, 1);
 
   // initialize the player entity
   for (int i=0; i<5; i++) {
@@ -255,6 +281,7 @@ int game_run()
 
   game_tick += delta_time;
   projectile_timer -= delta_time;
+  mapping_timer -= delta_time;
 
   // update at a constant rate to keep physics in check
   accumulator += delta_time;
@@ -278,7 +305,7 @@ int game_run()
       if (ui_rendering)
         break;
 
-      if (projectile_run()) {
+      if (projectile_run() || magic_mapping) {
         break;
       }
 
@@ -318,7 +345,6 @@ int game_run()
 
       if (e->ident == IDENT_PLAYER) {
         player_path(player);
-        P_DBG("%f\n", player->energy);
       }
     }
 
@@ -361,6 +387,9 @@ void game_keypressed(SDL_Scancode key)
     ui_state = UI_STATE_NONE;
     ui_reset();
   }
+
+  if (key == SDL_SCANCODE_Q)
+    game_action_restart();
 
   switch (ui_state) {
     case UI_STATE_INVENTORY: {
@@ -525,6 +554,39 @@ void game_render()
     ui_popup(player, buf, 255, 255, 120, 255);
 
     tile_on = level.tiles[(aim_y * TILES_X) + aim_x].tile;
+  }
+
+  if (magic_mapping && mapping_timer <= 0.0f) {
+    int dark = 0;
+    for (int y=0; y<level.h; y++) {
+      for (int x=0; x<level.w; x++) {
+        int index = (y * level.w) + x;
+        int firsttile = level.tiles[index].tile;
+        u8 alpha = level.tiles[index].a;
+
+        if (alpha < 200)
+          continue;
+
+        for (int j=0; j<4; j++) {
+          int tx = CLAMP(abs(x + adjacent[j][0]), 0, level.w-1);
+          int ty = CLAMP(abs(y + adjacent[j][1]), 0, level.h-1);
+          int tile = level.tiles[(ty * level.w) + tx].tile;
+          if (get_walkable(tile) || get_walkable(firsttile) || tile == BLOCK_WATER_DEEP) {
+            level_alpha[(ty * level.w) + tx] = 255;
+          }
+        }
+      }
+    }
+      
+    for (int i=0; i<TILES_NUM; i++) {
+      tile_t *tile = &level.tiles[i];
+      tile->a = level_alpha[i];
+      if (level_alpha[i])
+        level_alpha[i] = 50;
+    }
+
+    P_DBG("mapping %i\n", magic_mapping);
+    mapping_timer = 0.00125f;
   }
 
   ui_character(player);
@@ -729,4 +791,21 @@ void game_action_get()
 {
   action_get(player);
   paused = 0;
+}
+
+void game_action_restart()
+{
+  if (player && player->alive)
+    return;
+  dungeon_depth = 0;
+  generate_dungeon(dungeon_depth, 1);
+}
+
+void game_action_stairs()
+{
+  int tile = level.tiles[(player->position.to[1] * level.w) + player->position.to[0]].tile;
+  if (tile == BLOCK_STAIRS) {
+    dungeon_depth++;
+    generate_dungeon(dungeon_depth, 0);
+  }
 }

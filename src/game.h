@@ -29,6 +29,7 @@ extern int paused;
 extern int tile_on;
 extern int dungeon_depth;
 extern int aim_x, aim_y;
+extern int magic_mapping;
 
 void projectile_start(int fromx, int fromy, int tox, int toy, int t);
 

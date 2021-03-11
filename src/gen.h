@@ -114,7 +114,7 @@ typedef struct {
   u32        room_id;  // unique room ID
 } tile_data_t;
 
-void gen(tilesheet_packet_t *packet);
+void gen(tilesheet_packet_t *packet, int depth);
 
 #define SLICE_SIZE 128
 
