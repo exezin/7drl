@@ -13,7 +13,8 @@ extern u8 level_alpha[TILES_NUM];
 extern u8 fov_alpha[TILES_NUM];
 
 typedef struct comp_ai_t {
-  int aggro, target;
+  int aggro, target, hostile;
+  int dumb, splitter;
 } comp_ai_t;
 
 typedef struct comp_inventory_t {
@@ -31,7 +32,7 @@ typedef struct comp_container_t {
 typedef struct comp_stats_t {
   int health, max_health;
   int level, exp;
-
+  int expmod;
   int base_damage;
 } comp_stats_t;
 
@@ -69,7 +70,7 @@ typedef struct {
   u32 id, ident;
   int alive;
   float energy;
-  char name[64];
+  char name[64], description[128];
 
   // components we can have
   comp_flags_t      components;
@@ -143,6 +144,8 @@ static void comp_container(entity_t *e, int item, int uses, int x, int y)
     tile = BLOCK_SWORD;
   if (item > ITEM_WAND_START && item < ITEM_WAND_END)
     tile = BLOCK_WAND;
+  if (item == ITEM_KEY)
+    tile = 68+9;
   if (item == ITEM_NONE)
     return;
   comp_renderable(e, tile, 255, 120, 255, 255);
@@ -170,6 +173,12 @@ void player_path(entity_t *e);
 void container(int item, int uses, int x, int y);
 void fov(entity_t *e);
 
+void goblin(int level, int x, int y);
+void goblin_caster(int level, int x, int y);
+void jackel(int level, int x, int y);
+void zombie(int level, int x, int y);
+void bat(int level, int x, int y);
+void blob(int level, int x, int y, int angry);
 
 void system_move(entity_t *e);
 void system_renderable(entity_t *e);

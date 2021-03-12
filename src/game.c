@@ -28,6 +28,7 @@ int entity_index = 0;
 
 int use_item = 0;
 int tile_on = 0;
+int locked = 1;
 
 int aim_x = 0, aim_y = 0;
 
@@ -146,7 +147,7 @@ void generate_dungeon(int depth, int reset)
       entity_remove(player->id);
     entity_new(&player, IDENT_PLAYER, "PLAYER");
     comp_renderable(player, 38, 255, 255, 255, 255);
-    comp_speed(player, 1.0f);
+    comp_speed(player, 0.5f);
     comp_move(player);
     comp_stats(player, 100, 1, 5);
     comp_inventory(player);
@@ -175,9 +176,40 @@ void generate_dungeon(int depth, int reset)
 
   container(ITEM_POTION_HEALING, 1, player->position.to[0], player->position.to[1]);
   container(ITEM_SCROLL_MAPPING, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_WAND_FIREBOLT, 10, player->position.to[0], player->position.to[1]);
+  container(ITEM_WAND_IDENTIFY, 100, player->position.to[0], player->position.to[1]);
   container(ITEM_GEAR_CHAINHELM, 1, player->position.to[0], player->position.to[1]);
   container(ITEM_GEAR_IRONDAGGER, 1, player->position.to[0], player->position.to[1]);
+
+  for (int i=0; i<5; i++) {
+    int x, y;
+    int tile = 0;
+    while (tile != BLOCK_FLOOR) {
+      x = rand() % level.w;
+      y = rand() % level.h;
+      tile = level.tiles[(y * level.w) + x].tile;
+    }
+    goblin(1, x, y);
+    jackel(1, x, y);
+    zombie(1, x, y);
+    bat(1, x, y);
+    blob(1, x, y, 0);
+    if (!(rand() % 5))
+      goblin_caster(1, x, y);
+  }
+
+  // give one mob a key
+  int ids[ENTITY_STACK_MAX], id_last = 0;
+  for (int i=0; i<ENTITY_STACK_MAX; i++) {
+    entity_t *e = entity_stack[i];
+    if (!e || !e->alive || e->ident != IDENT_NPC || !e->components.inventory)
+      continue;
+
+    ids[id_last++] = i;
+  }
+  if (id_last)
+    inventory_add(entity_stack[ids[rand() % id_last]], ITEM_KEY, 1);
+  else
+    P_DBG("Error cannot generate key mob\n");
 }
 
 
@@ -239,26 +271,6 @@ ERR game_init()
   entity_tiles.tiles = calloc(1, sizeof(tile_t) * entity_tiles.w * entity_tiles.h);
 
   generate_dungeon(dungeon_depth, 1);
-
-  // initialize the player entity
-  for (int i=0; i<5; i++) {
-    int x, y;
-    int tile = 0;
-    while (tile != BLOCK_FLOOR) {
-      x = rand() % level.w;
-      y = rand() % level.h;
-      tile = level.tiles[(y * level.w) + x].tile;
-    }
-    entity_new(&monster, IDENT_NPC, "GOBLIN");
-    comp_position(monster, x, y);
-    comp_renderable(monster, 'G'-64, 255, 255, 255, 255);
-    comp_speed(monster, 0.5f);
-    comp_move(monster);
-    comp_stats(monster, 50, 1, 5);
-    comp_ai(monster);
-    comp_inventory(monster);
-    inventory_add(monster, ITEM_WAND_FIREBOLT, 10);
-  }
  
   return SUCCESS;
 }
@@ -295,8 +307,13 @@ int game_run()
 
     if (!player->alive) {
       paused = 1;
-      ui_reset();
-      ui_dead();
+      if (ui_state == UI_STATE_END) {
+        ui_reset();
+        ui_end();
+      } else {
+        ui_reset();
+        ui_dead();
+      }
     }
 
     // handle entities
@@ -320,12 +337,17 @@ int game_run()
       // are we already paused?
       if (paused && !entity_index)
         break;
-
+        
+      float energy = e->energy;
+      int hp = e->components.stats ? e->stats.health : 0;
       system_stats(e);
       system_ai(e);
       system_inventory(e);
       system_move(e);
       system_renderable(e);
+      if (e->energy == energy && e->components.stats && hp == e->stats.health && e->energy >= (ENERGY_MIN-0.01f)) {
+        e->stats.health = MIN(e->stats.health + 2, e->stats.max_health);
+      }
       system_energy(e);
 
       // did this entity spawn a projectile?
@@ -585,8 +607,8 @@ void game_render()
         level_alpha[i] = 50;
     }
 
-    P_DBG("mapping %i\n", magic_mapping);
-    mapping_timer = 0.00125f;
+    mapping_timer = 0.015f;
+    magic_mapping--;
   }
 
   ui_character(player);
@@ -795,7 +817,7 @@ void game_action_get()
 
 void game_action_restart()
 {
-  if (player && player->alive)
+  if (player && player->alive && (ui_state != UI_STATE_DEAD || ui_state != UI_STATE_END))
     return;
   dungeon_depth = 0;
   generate_dungeon(dungeon_depth, 1);
@@ -804,8 +826,18 @@ void game_action_restart()
 void game_action_stairs()
 {
   int tile = level.tiles[(player->position.to[1] * level.w) + player->position.to[0]].tile;
-  if (tile == BLOCK_STAIRS) {
+  if (tile == BLOCK_STAIRS && !locked && player->alive) {
     dungeon_depth++;
+    if (dungeon_depth > 4) {
+      ui_end();
+      player->alive = 0;
+      return;
+    }
     generate_dungeon(dungeon_depth, 0);
+    locked = 1;
+    projectile.tile = 0;
+    ui_popup(player, "YOU ASCEND A LEVEL", 255, 255, 120, 255);
+  } else if (tile == BLOCK_STAIRS && locked) {
+    ui_popup(player, "LOCKED! PERHAPS SOMEBODY HAS A KEY?", 255, 255, 120, 255);
   }
 }

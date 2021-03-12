@@ -10,6 +10,8 @@ extern tilesheet_packet_t level, entity_tiles;
 u8 level_alpha[TILES_NUM] = {0};
 u8 fov_alpha[TILES_NUM] = {0};
 
+extern entity_t *player;
+
 void entity_new(entity_t **ret, u32 identifier, const char *name)
 {
   for (int i=0; i<ENTITY_STACK_MAX; i++) {
@@ -52,6 +54,21 @@ entity_t *entity_get(int x, int y)
   return NULL;
 }
 
+entity_t *entity_get_npc(int x, int y)
+{
+  for (int i=0; i<ENTITY_STACK_MAX; i++) {
+    entity_t *e = entity_stack[i];
+
+    if (!e || !e->alive || !e->components.position || e->ident != IDENT_NPC)
+      continue;
+
+    if (e->position.to[0] == x && e->position.to[1] == y)
+      return e;
+  }
+
+  return NULL;
+}
+
 /*-----------------------------------------/
 /---------------- MISC --------------------/
 /-----------------------------------------*/
@@ -63,7 +80,7 @@ void dijkstra(int *arr, int tox, int toy, int w, int h)
         u32 index = (y * w) + x;
         int tile = level.tiles[index].tile;
         arr[index] = get_walkable(tile) ? DIJ_MAX : -(DIJ_MAX+1);
-        entity_t *e = entity_get(x, y);
+        entity_t *e = entity_get_npc(x, y);
         int ident = e ? e->ident : IDENT_UNKNOWN;
         if (ident == IDENT_PLAYER || ident == IDENT_NPC)
           arr[index] = -(DIJ_MAX+1);
@@ -221,6 +238,123 @@ void container(int item, int uses, int x, int y)
   comp_container(e, item, uses, x, y);
 }
 
+void setdesc(entity_t *e, const char *desc)
+{
+  strncpy(e->description, desc, MIN(strlen(desc)+1, 128));
+}
+
+void goblin(int level, int x, int y)
+{
+  entity_t *monster;
+  entity_new(&monster, IDENT_NPC, "GOBLIN");
+  comp_position(monster, x, y);
+  comp_renderable(monster, 'G'-64, 255, 255, 255, 255);
+  comp_speed(monster, 0.25f);
+  comp_move(monster);
+  comp_stats(monster, 60, level, 5);
+  comp_ai(monster);
+  comp_inventory(monster);
+  inventory_add(monster, ITEM_GEAR_IRONDAGGER, 1);
+  monster->stats.expmod = 1;
+
+  //                ######################|######################|######################|######################|
+  setdesc(monster, "A GOBLIN WARRIOR. SLOW BUT HITS HARD");
+}
+
+void goblin_caster(int level, int x, int y)
+{
+  entity_t *monster;
+  entity_new(&monster, IDENT_NPC, "GOBLIN CASTER");
+  comp_position(monster, x, y);
+  comp_renderable(monster, 'G'-64, 255, 255, 255, 255);
+  comp_speed(monster, 0.25f);
+  comp_move(monster);
+  comp_stats(monster, 40, level, 2);
+  comp_ai(monster);
+  comp_inventory(monster);
+  inventory_add(monster, ITEM_WAND_FIREBOLT, 10);
+  monster->stats.expmod = 2;
+
+  //                ######################|######################|######################|######################|
+  setdesc(monster, "A GOBLIN MAGE. LIKELY  DEADLY AT RANGE BUT    RATHER FEEBLE");
+}
+
+void jackel(int level, int x, int y)
+{
+  entity_t *monster;
+  entity_new(&monster, IDENT_NPC, "JACKEL");
+  comp_position(monster, x, y);
+  comp_renderable(monster, 'J'-64, 255, 255, 255, 255);
+  comp_speed(monster, 1.0f);
+  comp_move(monster);
+  comp_stats(monster, 20, level, 3);
+  comp_ai(monster);
+  monster->ai.hostile = 1;
+  monster->stats.expmod = 1;
+
+  //                ######################|######################|######################|######################|
+  setdesc(monster, "A JACKEL. FAST AND     VICIOUS. NO USE TRYING TO OUTRUN THIS");
+}
+
+void bat(int level, int x, int y)
+{
+  entity_t *monster;
+  entity_new(&monster, IDENT_NPC, "BAT");
+  comp_position(monster, x, y);
+  comp_renderable(monster, 'B'-64, 255, 255, 255, 255);
+  comp_speed(monster, 1.0f);
+  comp_move(monster);
+  comp_stats(monster, 10, level, 1);
+  comp_ai(monster);
+  monster->ai.hostile = 1;
+  monster->stats.expmod = 1;
+
+  //                ######################|######################|######################|######################|
+  setdesc(monster, "A BAT. ITS PRETTY FAST IN FLIGHT BUT WONT PUT UP MUCH OF A FIGHT");
+}
+
+void zombie(int level, int x, int y)
+{
+  entity_t *monster;
+  entity_new(&monster, IDENT_NPC, "ZOMBIE");
+  comp_position(monster, x, y);
+  comp_renderable(monster, 'Z'-64, 255, 255, 255, 255);
+  comp_speed(monster, 0.25f);
+  comp_move(monster);
+  comp_stats(monster, 80, level, 8);
+  comp_ai(monster);
+  comp_inventory(monster);
+  monster->ai.hostile = 1;
+  monster->ai.dumb = 1;
+  monster->stats.expmod = 3;
+
+  //                ######################|######################|######################|######################|
+  setdesc(monster, "A MINDLESS ZOMBIE.     PROBABLY WONT REMEMBER SEEING YOU FOR LONG");
+}
+
+void blob(int level, int x, int y, int angry)
+{
+  entity_t *monster;
+  entity_new(&monster, IDENT_NPC, "CREATURE");
+  comp_position(monster, x, y);
+  comp_renderable(monster, 43, 255, 255, 255, 255);
+  comp_speed(monster, 1.0f);
+  comp_move(monster);
+  comp_stats(monster, 20, level, 1);
+  comp_ai(monster);
+  comp_inventory(monster);
+  monster->ai.splitter = 1;
+  monster->stats.expmod = 1;
+
+  if (angry) {
+    monster->ai.aggro = 1;
+    monster->ai.target = player->id;
+  }
+
+  //                ######################|######################|######################|######################|
+  setdesc(monster, "A BUBBLING GELATINOUS  BLOB. RUMOUR HAS IT    THESE SPLIT INTO TWO   WHEN THREATENED");
+}
+
 /*-----------------------------------------/
 /---------------- SYSTEMS -----------------/
 /-----------------------------------------*/
@@ -228,6 +362,28 @@ void system_renderable(entity_t *e)
 {
   if (!e->components.renderable || !e->components.position)
     return;
+
+  if (e->ident == IDENT_CONTAINER) {
+    for (int i=0; i<ENTITY_STACK_MAX; i++) {
+      entity_t *ent = entity_stack[i];
+      if (!ent || !ent->alive || ent->ident != IDENT_CONTAINER || ent->id == e->id )
+        continue;
+
+      if (ent->position.to[0] != e->position.to[0] || ent->position.to[1] != e->position.to[1])
+        continue;
+
+      for (int j=0; j<8; j++) {
+        int tx = e->position.to[0] + around[j][0];
+        int ty = e->position.to[1] + around[j][1];
+        int tile = level.tiles[(ty * level.w) + tx].tile;
+        if (tile != BLOCK_DOOR && get_walkable(tile) && !entity_get(tx, ty)) {
+          e->position.to[0] = tx;
+          e->position.to[1] = ty;
+          break;
+        }
+      }
+    }
+  }
 
   if (e->ident == IDENT_CONTAINER) {
     entity_t *on = entity_get(e->position.to[0], e->position.to[1]);
@@ -299,7 +455,7 @@ void system_move(entity_t *e)
   int entity_tile = entity_tiles.tiles[to_index(to[0], to[1])].tile;
   entity_t *entity = NULL;
   if (entity_tile)
-    entity = entity_get(to[0], to[1]);
+    entity = entity_get_npc(to[0], to[1]);
   u32 ident = (entity != NULL) ? entity->ident : IDENT_UNKNOWN;
   if (entity && e->id == entity->id)
     ident = IDENT_UNKNOWN;
@@ -457,16 +613,24 @@ void system_inventory(entity_t *e)
       -------- */
       switch (item) {
         case ITEM_POTION_HEALING: {
-          e->stats.health = MIN(e->stats.health + 10, e->stats.max_health);
+          e->stats.health = MIN(e->stats.health + (e->stats.max_health/2), e->stats.max_health);
           break;
         }
         case ITEM_SCROLL_MAPPING: {
-          magic_mapping = 1;
+          magic_mapping = 75;
           break;
         }
       }
       if (!new) {
-        if (item > ITEM_POTION_START && item < ITEM_POTION_END) {
+        if (item == ITEM_KEY) {
+          if (level.tiles[(e->position.to[1] * level.w) + e->position.to[0]].tile == BLOCK_STAIRS) {
+            ui_popup(e, "YOU UNLOCK THE EXIT AND THE KEY DISSOLVES", 255, 255, 120, 255);
+            locked = 0;
+            e->inventory.items[index] = 0;
+          } else {
+            ui_popup(e, "I SEE NOTHING TO USE THE KEY ON HERE", 255, 255, 120, 255);
+          }
+        } else if (item > ITEM_POTION_START && item < ITEM_POTION_END) {
           char buf[128];
           sprintf(buf, "YOU CONSUME %s", item_info[item].name);
           ui_popup(e, buf, 255, 255, 120, 255);
@@ -476,7 +640,9 @@ void system_inventory(entity_t *e)
           ui_popup(e, buf, 255, 255, 120, 255);
         }
       }
-      e->inventory.items[index] = 0;
+
+      if (item != ITEM_KEY)
+        e->inventory.items[index] = 0;
     }
     
     e->inventory.use = -1;
@@ -540,6 +706,40 @@ void system_ai(entity_t *e)
   if (!e || !e->components.ai || e->energy < ENERGY_MIN)
     return;
 
+  // do equipt
+  if (e->components.inventory) {
+    for (int i=0; i<INVENTORY_MAX; i++) {
+      int item = e->inventory.items[i];
+      int equipt = e->inventory.equipt[i];
+      if (item > ITEM_GEAR_START && item <ITEM_GEAR_END && !equipt) {
+        action_use(e, i);
+        return;
+      }
+    }
+  }
+
+  // if hostile, scan for target
+  int done = 0, found = 0;
+  int distance = 0, x = e->position.to[0], y = e->position.to[1];
+  err = 999; err2=999;
+  if (e->ai.hostile && !e->ai.aggro) {
+    while (!done) {
+      done = line(&x, &y, player->position.to[0], player->position.to[1]);
+      if (!get_solid(level.tiles[(y*level.w)+x].tile) || distance > 10) {
+        break;
+      }
+
+      distance++;
+    }
+    if (x == player->position.to[0] && y == player->position.to[1]) {
+      e->ai.target = player->id;
+      e->ai.aggro = 1;
+      char buf[128];
+      sprintf(buf, "THE %s NOTICES YOU", e->name);
+      ui_popup(player, buf, 255, 255, 120, 255);
+    }
+  }
+
   // do wander
   if (!e->ai.aggro) {
     int dx = (-1 + (rand() % 3)) + e->position.to[0];
@@ -560,26 +760,9 @@ void system_ai(entity_t *e)
   if (!target)
     return;
 
-  int dist_x = abs(e->position.to[0] - target->position.to[0]);
-  int dist_y = abs(e->position.to[1] - target->position.to[1]);
-
-  // do flee
-  float hp = ((float)e->stats.health / e->stats.max_health);
-  if (hp <= 0.3f) {
-    if (target->ident == IDENT_PLAYER) {
-      e->move.dmap = path_from_player;
-
-      if (dist_x < 2 && dist_y < 2 && !(rand() % 2)) {
-        action_bump(e, target);
-        e->energy = 0;
-      }
-    }
-    return;
-  }
-
   // see if target is visible
-  int done = 0;
-  int distance = 0, x = e->position.to[0], y = e->position.to[1];
+  done = 0;
+  distance = 0; x = e->position.to[0]; y = e->position.to[1];
   err = 999; err2=999;
   while (!done) {
     done = line(&x, &y, target->position.to[0], target->position.to[1]);
@@ -590,6 +773,31 @@ void system_ai(entity_t *e)
     }
 
     distance++;
+  }
+
+  int dist_x = abs(e->position.to[0] - target->position.to[0]);
+  int dist_y = abs(e->position.to[1] - target->position.to[1]);
+
+  // do flee
+  float hp = ((float)e->stats.health / e->stats.max_health);
+  if (hp <= 0.3f || (hp <= 0.5f && e->ai.splitter)) {
+    if (target->ident == IDENT_PLAYER) {
+      e->move.dmap = path_from_player;
+
+      if (dist_x < 2 && dist_y < 2 && !(rand() % 2)) {
+        action_bump(e, target);
+        e->energy = 0;
+      }
+
+      // do split
+      if (e->ai.splitter && (x != target->position.to[0] || y != target->position.to[1])) {
+        for (int i=0; i<2; i++) {
+          blob(e->stats.level, e->position.to[0], e->position.to[1], 1);
+        }
+        action_damage(e, e, 1000);
+      }
+    }
+    return;
   }
   
   int item = ITEM_NONE;
@@ -623,7 +831,7 @@ void system_ai(entity_t *e)
       projectile.g = 120;
       projectile.b = 255;
     } else {
-      if (dist_x < 2 && dist_y < 2 && e->speed.speed < (target->speed.speed - 0.01f)) {
+      if (dist_x < 2 && dist_y < 2) { // && e->speed.speed < (target->speed.speed - 0.01f)
         // do bump attack
         action_bump(e, target);
         e->energy = 0;
@@ -639,9 +847,17 @@ void system_ai(entity_t *e)
       }
     }
   } else {
-    e->move.dmap = path_to_player;
-    e->move.target[0] = e->position.to[0];
-    e->move.target[1] = e->position.to[1];
+    if (!e->ai.dumb) {
+      e->move.dmap = path_to_player;
+      e->move.target[0] = e->position.to[0];
+      e->move.target[1] = e->position.to[1];
+    } else {
+      e->ai.target = -1;
+      e->ai.aggro = 0;
+      char buf[128];
+      sprintf(buf, "THE %s FORGETS ABOUT YOU", e->name);
+      ui_popup(player, buf, 255, 255, 120, 255);
+    }
   }
     
 }
@@ -731,6 +947,11 @@ void action_damage(entity_t *a, entity_t *b, int damage)
   if (!b || !b->components.stats)
     return;
 
+  if (!damage) {
+    ui_inspect(b);
+    return;
+  }
+
   int defense = 0;
   if (b->components.inventory) {
     for (int i=0; i<INVENTORY_MAX; i++) {
@@ -744,7 +965,7 @@ void action_damage(entity_t *a, entity_t *b, int damage)
 
   b->stats.health -= damage;
 
-  ui_print("x", b->position.to[0], b->position.to[1], 255, 120, 120, 255);
+  ui_print("x", b->position.to[0], b->position.to[1], 255, 0, 0, 200);
 
   if (b->components.ai) {
     b->ai.aggro  = 1;
@@ -766,6 +987,26 @@ void action_damage(entity_t *a, entity_t *b, int damage)
     ui_print("@", b->position.to[0], b->position.to[1], 255, 120, 120, 255);
     sprintf(buf, "%s DIES", b->name);
     ui_popup(b, buf, 255, 120, 120, 255);
+
+    a->stats.exp += b->stats.expmod;
+    if (a->stats.exp > a->stats.level * 2) {
+      a->stats.exp = 0;
+      a->stats.level++;
+      a->stats.max_health += 15 * a->stats.level;
+      a->stats.health = a->stats.max_health;
+      a->stats.base_damage += 2;
+      sprintf(buf, "LEVEL UP! HEALTH AND DAMAGE INCREASED");
+      ui_popup(b, buf, 255, 255, 120, 255);
+    }
+
+    // drop items
+    if (b->components.inventory) {
+      for (int i=0; i<INVENTORY_MAX; i++) {
+        if (b->inventory.items[i]) {
+          container(b->inventory.items[i], b->inventory.uses[i], b->position.to[0], b->position.to[1]);
+        }
+      }
+    }
   }
 
   if (b->ident == IDENT_PLAYER) {

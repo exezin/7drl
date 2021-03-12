@@ -10,8 +10,10 @@ typedef enum {
   UI_STATE_FIRE,
   UI_STATE_USE,
   UI_STATE_ITEM,
+  UI_STATE_INSPECT,
   UI_STATE_AIM,
   UI_STATE_DEAD,
+  UI_STATE_END,
 } ui_state_e;
 
 extern int ui_rendering;
@@ -48,5 +50,9 @@ void ui_item(entity_t *e, int item);
 void ui_character();
 
 void ui_dead();
+
+void ui_end();
+
+void ui_inspect(entity_t *e);
 
 #endif // UI_H

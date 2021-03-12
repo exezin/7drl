@@ -709,7 +709,7 @@ void gen(tilesheet_packet_t *packet, int depth)
   }
 
   // do prefabs
-  place_prefab(&map, &prefab_treasure);
+  // place_prefab(&map, &prefab_treasure);
 
   // do exit and spawn
   place_exit(&map);

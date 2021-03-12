@@ -177,6 +177,14 @@ int ui_print(const char *str, u32 x, u32 y, u8 r, u8 g, u8 b, u8 a)
           c = 74;
           break;
         }
+        case '!': {
+          c = 37;
+          break;
+        }
+        case '.': {
+          c = 39;
+          break;
+        }
       }
     }
 
@@ -232,6 +240,8 @@ void ui_inventory(entity_t *e)
       tile = BLOCK_GEAR;
     if (item > ITEM_WAND_START && item < ITEM_WAND_END)
       tile = BLOCK_WAND;
+    if (item == ITEM_KEY)
+      tile = 68+9;
     if (item == ITEM_NONE)
       continue;
 
@@ -365,6 +375,8 @@ void ui_item(entity_t *e, int item)
     tile = BLOCK_GEAR;
   if (itemid > ITEM_WAND_START && itemid < ITEM_WAND_END)
     tile = BLOCK_WAND;
+  if (itemid == ITEM_KEY)
+    tile = 68+9;
 
   char buf[128];
   int width = 24;
@@ -453,7 +465,7 @@ void ui_character(entity_t *e)
   ui_print("[", 0, TILES_Y, r, g, b, a);
   ui_print("]", TILES_X, TILES_Y, r, g, b, a);
 
-  sprintf(buf, ">LEVEL %i OGRE<", e->stats.level);
+  sprintf(buf, ">LEVEL %i<", e->stats.level);
   ui_print(buf, (TILES_X/2)-strlen(buf)/2, 0, 100, 100, 120, 255);
 
   // health
@@ -461,7 +473,7 @@ void ui_character(entity_t *e)
   ui_print(buf, (TILES_X/2)-strlen(buf)/2, TILES_Y, 100, 100, 120, 255);
 
   // health
-  sprintf(buf, ">DEPTH %i<", dungeon_depth);
+  sprintf(buf, ">DEPTH %i<", 4 - dungeon_depth);
   ui_print(buf, (TILES_X)-strlen(buf)-1, TILES_Y, 100, 100, 120, 255);
 
   if (tile_on) { 
@@ -481,18 +493,93 @@ void ui_character(entity_t *e)
         sprintf(buf, ">WATER<");
         break;
       }
+      case BLOCK_STAIRS: {
+        sprintf(buf, ">STAIRS UP<");
+        break;
+      }
     }
     ui_print(buf, 1, TILES_Y, 100, 100, 120, 255);
   }
 }
 
+void ui_inspect(entity_t *e)
+{
+  ui_reset();
+
+  if (strlen(e->description) < 1)
+    return;
+
+  int tile = e->renderable.tile;
+
+  char buf[128];
+  int width = 24;
+  int x = (TILES_X/2) - (width/2), y = (TILES_Y/2) - (INVENTORY_MAX / 2);
+
+  ui_print("{_______________________}", x, y, 100, 100, 120, 255);
+  
+  sprintf(buf, ">%s<", e->name);
+  ui_print(buf, x+2, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+
+  // description
+  ui_maxlen = 22;
+  sprintf(buf, "%s", e->description);
+  int count = ui_print(buf, x+1, y, 100, 100, 120, 255);
+  ui_maxlen = 0;
+  for (int i=0; i<=count+1; i++) {
+    ui_print("|                       |", x, y++, 100, 100, 120, 255);
+  }
+  ui_maxlen = 22;
+  ui_print(buf, x+1, y-count-2, 100, 100, 120, 255);
+  ui_maxlen = 0;
+  // y--;
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  if (e->ai.hostile)
+    sprintf(buf, "HOSTILE YES");
+  else
+    sprintf(buf, "HOSTILE NO");
+  ui_print(buf, x+1, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "HEALTH  %i/%i", e->stats.health, e->stats.max_health);
+  ui_print(buf, x+1, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "SPEED   %i", (int)(100 * e->speed.speed));
+  ui_print(buf, x+1, y++, 100, 100, 120, 255);
+  
+  ui_print("[_______________________]", x, y, 100, 100, 120, 255);
+
+  ui_tiles.tiles[(y*ui_tiles.w)+x+12].tile = tile;
+  ui_tiles.tiles[(y*ui_tiles.w)+x+12].r = 255;
+  ui_tiles.tiles[(y*ui_tiles.w)+x+12].b = 255;
+  ui_tiles.tiles[(y*ui_tiles.w)+x+13].tile = 75;
+  ui_tiles.tiles[(y*ui_tiles.w)+x+11].tile = 74;
+
+  ui_rendering = 1;
+  ui_state = UI_STATE_INSPECT;
+}
+
 void ui_dead()
 {
+  ui_state = UI_STATE_DEAD; 
   char buf[128];
-  sprintf(buf, "YOU HAVE DIED ON LEVEL %i", dungeon_depth);
+  sprintf(buf, "YOU HAVE DIED ON LEVEL %i", 4 - dungeon_depth);
   ui_print(buf, (TILES_X/2)-strlen(buf)/2, (TILES_Y/2)-2, 255, 120, 120, 255);
   sprintf(buf, "PRESS Q TO RETURN TO THE MENU");
   ui_print(buf, (TILES_X/2)-strlen(buf)/2, (TILES_Y/2)-1, 255, 120, 120, 255);
+}
+
+void ui_end()
+{
+  ui_state = UI_STATE_END; 
+  char buf[128];
+  sprintf(buf, "YOU HAVE ESCAPED THE DUNGEON");
+  ui_print(buf, (TILES_X/2)-strlen(buf)/2, (TILES_Y/2)-2, 255, 255, 120, 255);
+  sprintf(buf, "PRESS Q TO RETURN TO THE MENU");
+  ui_print(buf, (TILES_X/2)-strlen(buf)/2, (TILES_Y/2)-1, 255, 255, 120, 255);
 }
 
 void ui_reset()

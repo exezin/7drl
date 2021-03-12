@@ -39,6 +39,7 @@ typedef enum {
 
   // one time use
   ITEM_POTION_START,
+  ITEM_KEY,
   ITEM_POTION_HEALING,
   ITEM_POTION_END,
 
@@ -50,6 +51,7 @@ typedef enum {
   // multi time use
   ITEM_WAND_START,
   ITEM_WAND_FIREBOLT,
+  ITEM_WAND_IDENTIFY,
   ITEM_WAND_END,
 
   // wearables

@@ -36,6 +36,14 @@ void db()
   db_set_name(ITEM_WAND_FIREBOLT, "WAND");
   db_set_desc(ITEM_WAND_FIREBOLT, "AN UNIDENTIFIED WAND");
 
+  // wand of identify
+  item_info[ITEM_WAND_IDENTIFY].base_uses = 20;
+  item_info[ITEM_WAND_IDENTIFY].range = 100;
+  item_info[ITEM_WAND_IDENTIFY].damage = 0;
+  item_info[ITEM_WAND_IDENTIFY].identified = 1;
+  db_set_name(ITEM_WAND_IDENTIFY, "WAND OF IDENTIFY");
+  db_set_desc(ITEM_WAND_IDENTIFY, "SILENTLY IDENTIFIES ANDINSPECTS A CREATURE");
+
   // chain helmet
   item_info[ITEM_GEAR_CHAINHELM].armor = 5;
   item_info[ITEM_GEAR_CHAINHELM].slot = SLOT_HEAD;
@@ -49,6 +57,12 @@ void db()
   item_info[ITEM_GEAR_IRONDAGGER].identified = 1;
   db_set_name(ITEM_GEAR_IRONDAGGER, "IRON DAGGER");
   db_set_desc(ITEM_GEAR_IRONDAGGER, "A BASIC DAGGER FORGED FROM IRON");
+
+  // key
+  item_info[ITEM_KEY].base_uses = 1;
+  item_info[ITEM_KEY].identified = 1;
+  db_set_name(ITEM_KEY, "GOLDEN KEY");
+  db_set_desc(ITEM_KEY, "A GOLDEN KEY GLOWING   WITH MAGIC ENERGY");
 }
 
 void db_set(int item)
