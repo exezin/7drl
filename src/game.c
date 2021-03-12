@@ -129,6 +129,11 @@ int projectile_run()
   return 0;
 }
 
+void place_entity(entity_t *e)
+{
+  
+}
+
 void generate_dungeon(int depth, int reset)
 {
   for (int i=1; i<ENTITY_STACK_MAX; i++) {
@@ -142,15 +147,21 @@ void generate_dungeon(int depth, int reset)
   magic_mapping = 0;
 
   // initialize the player entity
-  if (reset) { 
+  if (reset) {
+    // initialize the item db
+    db();
+
     if (player)
       entity_remove(player->id);
     entity_new(&player, IDENT_PLAYER, "PLAYER");
     comp_renderable(player, 38, 255, 255, 255, 255);
     comp_speed(player, 0.5f);
-    comp_move(player);
     comp_stats(player, 100, 1, 5);
     comp_inventory(player);
+    inventory_add(player, ITEM_WAND_IDENTIFY, 100);
+    inventory_add(player, ITEM_POTION_HEALING, 1);
+
+    strcpy(player->description, "YOURSELF. NOT OVERLY   INTELLIGENT AND RATHER FEEBLE");
   }
 
   memset(level.tiles, 0, sizeof(tile_t) * level.w * level.h);
@@ -171,14 +182,18 @@ void generate_dungeon(int depth, int reset)
     tile = level.tiles[(y * level.w) + x].tile;
   }
   comp_position(player, x, y);
+  comp_move(player);
   fov(player);
   system_renderable(player);
 
-  container(ITEM_POTION_HEALING, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_SCROLL_MAPPING, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_WAND_IDENTIFY, 100, player->position.to[0], player->position.to[1]);
   container(ITEM_GEAR_CHAINHELM, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_GEAR_IRONDAGGER, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_CHAINCHEST, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_CHAINLEGS, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_IRONBOOTS, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_GLOVES, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_ARMS, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_GEAR_SHIELD, 1, player->position.to[0], player->position.to[1]);
+  container(ITEM_SCROLL_MAPPING, 1, player->position.to[0], player->position.to[1]);
 
   for (int i=0; i<5; i++) {
     int x, y;
@@ -193,6 +208,7 @@ void generate_dungeon(int depth, int reset)
     zombie(1, x, y);
     bat(1, x, y);
     blob(1, x, y, 0);
+    wizard(1, x, y);
     if (!(rand() % 5))
       goblin_caster(1, x, y);
   }
@@ -258,9 +274,6 @@ ERR game_init()
   keybinds[SDL_SCANCODE_U].action = &game_action_use;
   keybinds[SDL_SCANCODE_G].action = &game_action_get;
   keybinds[SDL_SCANCODE_SPACE].action = &game_action_stairs;
-
-  // initialize the item db
-  db();
 
   // tilemap specifically for entities
   entity_tiles.x = 0, entity_tiles.y = 0;

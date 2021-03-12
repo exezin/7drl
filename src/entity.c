@@ -20,6 +20,7 @@ void entity_new(entity_t **ret, u32 identifier, const char *name)
       entity_stack[i]->alive = 1;
       entity_stack[i]->id    = i;
       entity_stack[i]->ident = identifier;
+      entity_stack[i]->energy = 0.0f;
       strcpy(entity_stack[i]->name, name);
       *ret = entity_stack[i];
       return;
@@ -248,13 +249,14 @@ void goblin(int level, int x, int y)
   entity_t *monster;
   entity_new(&monster, IDENT_NPC, "GOBLIN");
   comp_position(monster, x, y);
-  comp_renderable(monster, 'G'-64, 255, 255, 255, 255);
+  comp_renderable(monster, 'G'-64, 120, 200, 120, 255);
   comp_speed(monster, 0.25f);
   comp_move(monster);
   comp_stats(monster, 60, level, 5);
   comp_ai(monster);
   comp_inventory(monster);
   inventory_add(monster, ITEM_GEAR_IRONDAGGER, 1);
+  monster->ai.flees = 1;
   monster->stats.expmod = 1;
 
   //                ######################|######################|######################|######################|
@@ -266,13 +268,14 @@ void goblin_caster(int level, int x, int y)
   entity_t *monster;
   entity_new(&monster, IDENT_NPC, "GOBLIN CASTER");
   comp_position(monster, x, y);
-  comp_renderable(monster, 'G'-64, 255, 255, 255, 255);
+  comp_renderable(monster, 'G'-64, 120, 255, 200, 255);
   comp_speed(monster, 0.25f);
   comp_move(monster);
   comp_stats(monster, 40, level, 2);
   comp_ai(monster);
   comp_inventory(monster);
   inventory_add(monster, ITEM_WAND_FIREBOLT, 10);
+  monster->ai.flees = 1;
   monster->stats.expmod = 2;
 
   //                ######################|######################|######################|######################|
@@ -284,11 +287,12 @@ void jackel(int level, int x, int y)
   entity_t *monster;
   entity_new(&monster, IDENT_NPC, "JACKEL");
   comp_position(monster, x, y);
-  comp_renderable(monster, 'J'-64, 255, 255, 255, 255);
+  comp_renderable(monster, 'J'-64, 200, 200, 200, 255);
   comp_speed(monster, 1.0f);
   comp_move(monster);
   comp_stats(monster, 20, level, 3);
   comp_ai(monster);
+  monster->ai.flees = 1;
   monster->ai.hostile = 1;
   monster->stats.expmod = 1;
 
@@ -301,11 +305,12 @@ void bat(int level, int x, int y)
   entity_t *monster;
   entity_new(&monster, IDENT_NPC, "BAT");
   comp_position(monster, x, y);
-  comp_renderable(monster, 'B'-64, 255, 255, 255, 255);
+  comp_renderable(monster, 'B'-64, 120, 120, 120, 255);
   comp_speed(monster, 1.0f);
   comp_move(monster);
   comp_stats(monster, 10, level, 1);
   comp_ai(monster);
+  monster->ai.flees = 0;
   monster->ai.hostile = 1;
   monster->stats.expmod = 1;
 
@@ -318,12 +323,13 @@ void zombie(int level, int x, int y)
   entity_t *monster;
   entity_new(&monster, IDENT_NPC, "ZOMBIE");
   comp_position(monster, x, y);
-  comp_renderable(monster, 'Z'-64, 255, 255, 255, 255);
+  comp_renderable(monster, 'Z'-64, 120, 255, 120, 255);
   comp_speed(monster, 0.25f);
   comp_move(monster);
   comp_stats(monster, 80, level, 8);
   comp_ai(monster);
   comp_inventory(monster);
+  monster->ai.flees = 0;
   monster->ai.hostile = 1;
   monster->ai.dumb = 1;
   monster->stats.expmod = 3;
@@ -337,12 +343,13 @@ void blob(int level, int x, int y, int angry)
   entity_t *monster;
   entity_new(&monster, IDENT_NPC, "CREATURE");
   comp_position(monster, x, y);
-  comp_renderable(monster, 43, 255, 255, 255, 255);
+  comp_renderable(monster, 'O'-64, 0, 255, 180, 255);
   comp_speed(monster, 1.0f);
   comp_move(monster);
-  comp_stats(monster, 20, level, 1);
+  comp_stats(monster, 20, level, 2);
   comp_ai(monster);
   comp_inventory(monster);
+  monster->ai.flees = 1;
   monster->ai.splitter = 1;
   monster->stats.expmod = 1;
 
@@ -353,6 +360,25 @@ void blob(int level, int x, int y, int angry)
 
   //                ######################|######################|######################|######################|
   setdesc(monster, "A BUBBLING GELATINOUS  BLOB. RUMOUR HAS IT    THESE SPLIT INTO TWO   WHEN THREATENED");
+}
+
+void wizard(int level, int x, int y)
+{
+  entity_t *monster;
+  entity_new(&monster, IDENT_NPC, "WIZARD");
+  comp_position(monster, x, y);
+  comp_renderable(monster, 'W'-64, 120, 120, 255, 255);
+  comp_speed(monster, 0.5f);
+  comp_move(monster);
+  comp_stats(monster, 50, level, 2);
+  comp_ai(monster);
+  comp_inventory(monster);
+  inventory_add(monster, ITEM_WAND_FIREBOLT, 20);
+  monster->ai.flees = 1;
+  monster->stats.expmod = 5;
+
+  //                ######################|######################|######################|######################|
+  setdesc(monster, "A CLOAKED WIZARD       EXCEPTIONALLY STRONG   MAGIC CASTER");
 }
 
 /*-----------------------------------------/
@@ -542,7 +568,6 @@ void system_inventory(entity_t *e)
     int ident = on ? on->ident : IDENT_UNKNOWN;
     if (ident == IDENT_CONTAINER) {
       int added = inventory_add(e, on->container.item, on->container.uses);
-        P_DBG("Get!\n");
       if (added) {
         char buf[128];
         sprintf(buf, "PICKED UP %s", item_info[on->container.item].name);
@@ -665,7 +690,7 @@ void system_inventory(entity_t *e)
       }
     }
     u32 ident = (entity != NULL) ? entity->ident : IDENT_UNKNOWN;
-    if (!entity || e->id == entity->id)
+    if (!entity) // || e->id == entity->id
       ident = IDENT_UNKNOWN;
     switch (ident) {
       case IDENT_PLAYER:
@@ -781,7 +806,7 @@ void system_ai(entity_t *e)
   // do flee
   float hp = ((float)e->stats.health / e->stats.max_health);
   if (hp <= 0.3f || (hp <= 0.5f && e->ai.splitter)) {
-    if (target->ident == IDENT_PLAYER) {
+    if (e->ai.flees && target->ident == IDENT_PLAYER) {
       e->move.dmap = path_from_player;
 
       if (dist_x < 2 && dist_y < 2 && !(rand() % 2)) {

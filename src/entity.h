@@ -14,7 +14,7 @@ extern u8 fov_alpha[TILES_NUM];
 
 typedef struct comp_ai_t {
   int aggro, target, hostile;
-  int dumb, splitter;
+  int dumb, splitter, flees;
 } comp_ai_t;
 
 typedef struct comp_inventory_t {
@@ -108,8 +108,8 @@ static void comp_speed(entity_t *e, float speed) {
 }
 static void comp_move(entity_t *e) {
   e->components.move = 1;
-  e->move.target[0] = e->position.from[0];
-  e->move.target[1] = e->position.from[1];
+  e->move.target[0] = e->position.to[0];
+  e->move.target[1] = e->position.to[1];
   e->move.dmap = NULL;
 }
 static void comp_stats(entity_t *e, int health, int level, int base_damage) {
@@ -179,6 +179,7 @@ void jackel(int level, int x, int y);
 void zombie(int level, int x, int y);
 void bat(int level, int x, int y);
 void blob(int level, int x, int y, int angry);
+void wizard(int level, int x, int y);
 
 void system_move(entity_t *e);
 void system_renderable(entity_t *e);

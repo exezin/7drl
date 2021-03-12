@@ -45,11 +45,53 @@ void db()
   db_set_desc(ITEM_WAND_IDENTIFY, "SILENTLY IDENTIFIES ANDINSPECTS A CREATURE");
 
   // chain helmet
-  item_info[ITEM_GEAR_CHAINHELM].armor = 5;
+  item_info[ITEM_GEAR_CHAINHELM].armor = 2;
   item_info[ITEM_GEAR_CHAINHELM].slot = SLOT_HEAD;
   item_info[ITEM_GEAR_CHAINHELM].identified = 1;
   db_set_name(ITEM_GEAR_CHAINHELM, "CHAINMAIL HELM");
   db_set_desc(ITEM_GEAR_CHAINHELM, "A HELMET MADE OF CHAIN MAIL");
+
+  // chain chest
+  item_info[ITEM_GEAR_CHAINCHEST].armor = 4;
+  item_info[ITEM_GEAR_CHAINCHEST].slot = SLOT_CHEST;
+  item_info[ITEM_GEAR_CHAINCHEST].identified = 1;
+  db_set_name(ITEM_GEAR_CHAINCHEST, "CHAINMAIL PLATE");
+  db_set_desc(ITEM_GEAR_CHAINCHEST, "A BREASTPLATE MADE OF CHAIN MAIL");
+
+  // chain legs
+  item_info[ITEM_GEAR_CHAINLEGS].armor = 3;
+  item_info[ITEM_GEAR_CHAINLEGS].slot = SLOT_LEGS;
+  item_info[ITEM_GEAR_CHAINLEGS].identified = 1;
+  db_set_name(ITEM_GEAR_CHAINLEGS, "CHAINMAIL LEGS");
+  db_set_desc(ITEM_GEAR_CHAINLEGS, "LEGGINGS MADE OF CHAIN MAIL");
+
+  // chain boots
+  item_info[ITEM_GEAR_IRONBOOTS].armor = 2;
+  item_info[ITEM_GEAR_IRONBOOTS].slot = SLOT_FEET;
+  item_info[ITEM_GEAR_IRONBOOTS].identified = 1;
+  db_set_name(ITEM_GEAR_IRONBOOTS, "IRON BOOTS");
+  db_set_desc(ITEM_GEAR_IRONBOOTS, "BOOTS FORGED FROM IRON");
+
+  // leather gloves
+  item_info[ITEM_GEAR_GLOVES].armor = 1;
+  item_info[ITEM_GEAR_GLOVES].slot = SLOT_HANDS;
+  item_info[ITEM_GEAR_GLOVES].identified = 1;
+  db_set_name(ITEM_GEAR_GLOVES, "LEATHER GLOVES");
+  db_set_desc(ITEM_GEAR_GLOVES, "BASIC LEATHER GLOVES");
+
+  // iron paulders
+  item_info[ITEM_GEAR_ARMS].armor = 2;
+  item_info[ITEM_GEAR_ARMS].slot = SLOT_ARMS;
+  item_info[ITEM_GEAR_ARMS].identified = 1;
+  db_set_name(ITEM_GEAR_ARMS, "IRON SPAULDERS");
+  db_set_desc(ITEM_GEAR_ARMS, "FORGED IRON SPAULDERS");
+
+  // leather shield
+  item_info[ITEM_GEAR_SHIELD].armor = 4;
+  item_info[ITEM_GEAR_SHIELD].slot = SLOT_LEFT;
+  item_info[ITEM_GEAR_SHIELD].identified = 1;
+  db_set_name(ITEM_GEAR_SHIELD, "LEATHER SHIELD");
+  db_set_desc(ITEM_GEAR_SHIELD, "A BASIC LEATHER SHIELD");
 
   // iron dagger
   item_info[ITEM_GEAR_IRONDAGGER].slot = SLOT_RIGHT;
@@ -57,6 +99,13 @@ void db()
   item_info[ITEM_GEAR_IRONDAGGER].identified = 1;
   db_set_name(ITEM_GEAR_IRONDAGGER, "IRON DAGGER");
   db_set_desc(ITEM_GEAR_IRONDAGGER, "A BASIC DAGGER FORGED FROM IRON");
+
+  // iron dagger
+  item_info[ITEM_GEAR_IRONSWORD].slot = SLOT_RIGHT;
+  item_info[ITEM_GEAR_IRONSWORD].damage = 8;
+  item_info[ITEM_GEAR_IRONSWORD].identified = 1;
+  db_set_name(ITEM_GEAR_IRONSWORD, "IRON LONG SWORD");
+  db_set_desc(ITEM_GEAR_IRONSWORD, "A BASIC LONG SWORD FORGED FROM IRON");
 
   // key
   item_info[ITEM_KEY].base_uses = 1;
