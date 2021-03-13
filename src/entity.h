@@ -164,6 +164,7 @@ static void comp_ai(entity_t *e)
 void entity_new(entity_t **ret, u32 identifier, const char *name);
 void entity_remove(u32 id);
 entity_t *entity_get(int x, int y);
+entity_t *entity_get_npc(int x, int y);
 
 
 void dijkstra(int *arr, int tox, int toy, int w, int h);

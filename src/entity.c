@@ -60,7 +60,7 @@ entity_t *entity_get_npc(int x, int y)
   for (int i=0; i<ENTITY_STACK_MAX; i++) {
     entity_t *e = entity_stack[i];
 
-    if (!e || !e->alive || !e->components.position || e->ident != IDENT_NPC)
+    if (!e || !e->alive || !e->components.position || (e->ident != IDENT_NPC && e->ident != IDENT_PLAYER))
       continue;
 
     if (e->position.to[0] == x && e->position.to[1] == y)
@@ -252,12 +252,21 @@ void goblin(int level, int x, int y)
   comp_renderable(monster, 'G'-64, 120, 200, 120, 255);
   comp_speed(monster, 0.25f);
   comp_move(monster);
-  comp_stats(monster, 60, level, 5);
+  comp_stats(monster, 80 + (5 * level), level, 2 + (3 * (level - 1)));
   comp_ai(monster);
   comp_inventory(monster);
-  inventory_add(monster, ITEM_GEAR_IRONDAGGER, 1);
   monster->ai.flees = 1;
   monster->stats.expmod = 1;
+  if (level < 2) {
+    inventory_add(monster, ITEM_GEAR_IRONDAGGER, 1);
+  } else if (level < 4) {
+    if (!(rand() % 2))
+      inventory_add(monster, ITEM_GEAR_IRONDAGGER, 1);
+    else
+      inventory_add(monster, ITEM_GEAR_IRONSWORD, 1);
+  } else {
+    inventory_add(monster, ITEM_GEAR_GREATSWORD, 1);
+  }
 
   //                ######################|######################|######################|######################|
   setdesc(monster, "A GOBLIN WARRIOR. SLOW BUT HITS HARD");
@@ -269,9 +278,9 @@ void goblin_caster(int level, int x, int y)
   entity_new(&monster, IDENT_NPC, "GOBLIN CASTER");
   comp_position(monster, x, y);
   comp_renderable(monster, 'G'-64, 120, 255, 200, 255);
-  comp_speed(monster, 0.25f);
+  comp_speed(monster, 0.5f);
   comp_move(monster);
-  comp_stats(monster, 40, level, 2);
+  comp_stats(monster, 40 + (5 * level), level, 2 + (1 * (level - 1)));
   comp_ai(monster);
   comp_inventory(monster);
   inventory_add(monster, ITEM_WAND_FIREBOLT, 10);
@@ -290,9 +299,10 @@ void jackel(int level, int x, int y)
   comp_renderable(monster, 'J'-64, 200, 200, 200, 255);
   comp_speed(monster, 1.0f);
   comp_move(monster);
-  comp_stats(monster, 20, level, 3);
+  comp_stats(monster, 20 + (5 * level), level, 2 + (3 * (level - 1)));
   comp_ai(monster);
   monster->ai.flees = 1;
+  monster->ai.dumb = 1;
   monster->ai.hostile = 1;
   monster->stats.expmod = 1;
 
@@ -308,9 +318,10 @@ void bat(int level, int x, int y)
   comp_renderable(monster, 'B'-64, 120, 120, 120, 255);
   comp_speed(monster, 1.0f);
   comp_move(monster);
-  comp_stats(monster, 10, level, 1);
+  comp_stats(monster, 10 + (5 * level), level, 1 + (1 * (level - 1)));
   comp_ai(monster);
   monster->ai.flees = 0;
+  monster->ai.dumb = 1;
   monster->ai.hostile = 1;
   monster->stats.expmod = 1;
 
@@ -326,7 +337,7 @@ void zombie(int level, int x, int y)
   comp_renderable(monster, 'Z'-64, 120, 255, 120, 255);
   comp_speed(monster, 0.25f);
   comp_move(monster);
-  comp_stats(monster, 80, level, 8);
+  comp_stats(monster, 80 + (8 * level), level, 8 + (5 * (level - 1)));
   comp_ai(monster);
   comp_inventory(monster);
   monster->ai.flees = 0;
@@ -346,7 +357,7 @@ void blob(int level, int x, int y, int angry)
   comp_renderable(monster, 'O'-64, 0, 255, 180, 255);
   comp_speed(monster, 1.0f);
   comp_move(monster);
-  comp_stats(monster, 20, level, 2);
+  comp_stats(monster, 30 + (5 * level), level, 2 + (1 * (level - 1)));
   comp_ai(monster);
   comp_inventory(monster);
   monster->ai.flees = 1;
@@ -370,10 +381,10 @@ void wizard(int level, int x, int y)
   comp_renderable(monster, 'W'-64, 120, 120, 255, 255);
   comp_speed(monster, 0.5f);
   comp_move(monster);
-  comp_stats(monster, 50, level, 2);
+  comp_stats(monster, 60 + (10 * level), level, 2 + (2 * (level - 1)));
   comp_ai(monster);
   comp_inventory(monster);
-  inventory_add(monster, ITEM_WAND_FIREBOLT, 20);
+  inventory_add(monster, ITEM_WAND_LIGHTNING, 20);
   monster->ai.flees = 1;
   monster->stats.expmod = 5;
 
@@ -478,10 +489,7 @@ void system_move(entity_t *e)
   we attempt to move onto
   /-----------------------------------------*/
   // do entity-based action
-  int entity_tile = entity_tiles.tiles[to_index(to[0], to[1])].tile;
-  entity_t *entity = NULL;
-  if (entity_tile)
-    entity = entity_get_npc(to[0], to[1]);
+  entity_t *entity = entity_get_npc(to[0], to[1]);
   u32 ident = (entity != NULL) ? entity->ident : IDENT_UNKNOWN;
   if (entity && e->id == entity->id)
     ident = IDENT_UNKNOWN;
@@ -492,7 +500,8 @@ void system_move(entity_t *e)
       if (e->ident != entity->ident && e->ident != IDENT_NPC)
         action_bump(e, entity);
       action_stop(e);
-      e->energy = 0;;
+      action_stop(entity);
+      e->energy = 0;
       return;
     }
     case IDENT_UNKNOWN: {
@@ -516,7 +525,8 @@ void system_move(entity_t *e)
 
     // open door
     case BLOCK_DOOR: {
-      action_open(e, to[0], to[1]);
+      if (e->ident == IDENT_PLAYER || (e->ident == IDENT_NPC && !e->ai.dumb))
+        action_open(e, to[0], to[1]);
       action_stop(e);
       break;
     }
@@ -638,7 +648,7 @@ void system_inventory(entity_t *e)
       -------- */
       switch (item) {
         case ITEM_POTION_HEALING: {
-          e->stats.health = MIN(e->stats.health + (e->stats.max_health/2), e->stats.max_health);
+          e->stats.health = MIN((e->stats.health + (e->stats.max_health/2) + (rand() % 20)), e->stats.max_health);
           break;
         }
         case ITEM_SCROLL_MAPPING: {
@@ -696,6 +706,34 @@ void system_inventory(entity_t *e)
       case IDENT_PLAYER:
       case IDENT_NPC: {
         action_damage(e, entity, item_info[item].damage);
+        if (item == ITEM_WAND_LIGHTNING) {
+          for (int i=0; i<ENTITY_STACK_MAX; i++) {
+            if (e->ident == IDENT_NPC)
+              break;
+
+            entity_t *ent = entity_stack[i];
+            if (!ent || !ent->alive || ent->ident != IDENT_NPC)
+              continue;
+
+            // see if we have los
+            int sx = entity->position.to[0], sy = entity->position.to[1];
+            int done = 0, distance = 0;
+            while (!done) {
+              done = line(&sx, &sy, ent->position.to[0], ent->position.to[1]);
+              if (distance > 10 || !get_solid(level.tiles[(sy*level.w)+sx].tile)) {
+                done = 1;
+                break;
+              }
+            
+              if (sx == ent->position.to[0] && sy == ent->position.to[1]) {
+                action_damage(player, ent, item_info[item].damage / 2);
+                done = 1;
+                break;
+              }
+              distance++;
+            }
+          }
+        }
         break;
       }
       case IDENT_UNKNOWN: {
@@ -820,6 +858,10 @@ void system_ai(entity_t *e)
           blob(e->stats.level, e->position.to[0], e->position.to[1], 1);
         }
         action_damage(e, e, 1000);
+      } else if (!e->ai.splitter) {
+        if (dist_x > 15 || dist_y > 15) {
+          e->stats.health = MIN(e->stats.health + 5, e->stats.max_health);
+        }
       }
     }
     return;
@@ -855,8 +897,9 @@ void system_ai(entity_t *e)
       projectile.r = 255;
       projectile.g = 120;
       projectile.b = 255;
+      projectile.count = 0;
     } else {
-      if (dist_x < 2 && dist_y < 2) { // && e->speed.speed < (target->speed.speed - 0.01f)
+      if (dist_x < 2 && dist_y < 2 && (item == ITEM_NONE || !(rand() % 6))) { // && e->speed.speed < (target->speed.speed - 0.01f)
         // do bump attack
         action_bump(e, target);
         e->energy = 0;
@@ -918,9 +961,7 @@ void action_stop(entity_t *e)
 
   e->move.target[0] = e->position.to[0];
   e->move.target[1] = e->position.to[1];
-
-  if (e->ident == IDENT_PLAYER)
-    e->move.dmap = NULL;
+  e->move.dmap = NULL;
 }
 
 void action_open(entity_t *e, u32 x, u32 y)
@@ -962,7 +1003,7 @@ void action_bump(entity_t *a, entity_t *b)
     }
   }
 
-  int damage = a->stats.base_damage + weapon;
+  int damage = a->stats.base_damage + weapon + (a->stats.level * 2);
 
   action_damage(a, b, damage);
 }
@@ -985,6 +1026,8 @@ void action_damage(entity_t *a, entity_t *b, int damage)
       }
     }
   }
+
+  defense += (b->stats.level * 3);
 
   damage = MAX(1, damage - defense);
 
@@ -1014,10 +1057,10 @@ void action_damage(entity_t *a, entity_t *b, int damage)
     ui_popup(b, buf, 255, 120, 120, 255);
 
     a->stats.exp += b->stats.expmod;
-    if (a->stats.exp > a->stats.level * 2) {
+    if (a->stats.exp > (a->stats.level * 5)) {
       a->stats.exp = 0;
       a->stats.level++;
-      a->stats.max_health += 15 * a->stats.level;
+      a->stats.max_health += 5 * a->stats.level;
       a->stats.health = a->stats.max_health;
       a->stats.base_damage += 2;
       sprintf(buf, "LEVEL UP! HEALTH AND DAMAGE INCREASED");

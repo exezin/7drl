@@ -85,11 +85,11 @@ static inline int key_to_num(SDL_Scancode key) {
       use_item = 11;
       break;
     }
-    case SDL_SCANCODE_N: {
+    case SDL_SCANCODE_M: {
       use_item = 12;
       break;
     }
-    case SDL_SCANCODE_M: {
+    case SDL_SCANCODE_N: {
       use_item = 13;
       break;
     }

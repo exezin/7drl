@@ -12,7 +12,7 @@ BIN    =game
 
 # flags
 CFLAGS =-O3 -lm -ldl -std=c99 -lGL -lSDL2 -I. $(IDIRS)
-CFLAGS+=-g -Wall -Wno-unused
+CFLAGS+=-Wall -Wno-unused
 # ---
 
 # deps

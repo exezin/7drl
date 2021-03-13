@@ -10,7 +10,7 @@
 int ui_rendering = 0;
 int ui_state = 0;
 int ui_maxlen = 0;
-tilesheet_packet_t ui_tiles;
+tilesheet_packet_t ui_tiles = {NULL};
 
 /*
   HERE BE DRAGONS
@@ -543,6 +543,10 @@ void ui_inspect(entity_t *e)
   ui_print(buf, x+1, y++, 100, 100, 120, 255);
 
   ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "LEVEL   %i", e->stats.level);
+  ui_print(buf, x+1, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
   sprintf(buf, "HEALTH  %i/%i", e->stats.health, e->stats.max_health);
   ui_print(buf, x+1, y++, 100, 100, 120, 255);
 
@@ -560,6 +564,82 @@ void ui_inspect(entity_t *e)
 
   ui_rendering = 1;
   ui_state = UI_STATE_INSPECT;
+}
+
+void ui_menu()
+{
+  char buf[128];
+  int width = 24;
+  int x = (TILES_X/2) - (width/2), y = (TILES_Y/2) - (10);
+  
+  ui_print("{_______________________}", x, y++, 100, 100, 120, 255);
+  ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "ASCENDRL");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+  ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "YOU  FIND YOURSELF");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "TRAPPED   DEEP  IN");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "THIS  EVIL DUNGEON");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+  ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "NOT EVERYONE SEEMS");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "HOSTILE. PICK YOUR");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "BATTLES  WELL  AND");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "ESCAPE THIS  PLACE");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+  ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "WASDQEZC. MOVE");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+  // ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "IUF. ITEMS");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+  // ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "SPACE. INTERACT");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+  // ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "O. OPEN AND CLOSE");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "G. GRAB");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+
+  ui_print("|                       |", x, y, 100, 100, 120, 255);
+  sprintf(buf, "PERIOD. WAIT");
+  ui_print(buf, x+(width/2)-(strlen(buf)/2), y++, 100, 100, 120, 255);
+  ui_print("|                       |", x, y++, 100, 100, 120, 255);
+
+  ui_print("[_______________________]", x, y, 100, 100, 120, 255);
 }
 
 void ui_dead()

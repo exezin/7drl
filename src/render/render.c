@@ -218,10 +218,6 @@ void render_render()
 
   game_render();
   ui_render();
-  
-  // render debug vga font last
-  vga_render();
-  vga_clear();
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   use_shader(bloom_shader);
@@ -240,6 +236,7 @@ void render_render()
     buffer = !buffer;
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glDisable(GL_BLEND);
 
   // handle upscaling
   float x_scale = (float)window_width() / (float)WINDOW_WIDTH;

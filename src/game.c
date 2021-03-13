@@ -129,9 +129,79 @@ int projectile_run()
   return 0;
 }
 
-void place_entity(entity_t *e)
+void place_entity(int ent, int lvl, int number)
 {
-  
+  for (int num=0; num<number; num++) {
+    for (int a=0; a<1000; a++) {
+      int tx = rand() % TILES_X;
+      int ty = rand() % TILES_Y;
+      int tile = level.tiles[(ty * level.w) + tx].tile;
+      if (tile != BLOCK_FLOOR && tile != BLOCK_FLOOR+1)
+        continue;
+
+      int sx = tx, sy = ty;
+      int done = 0, distance = 0;
+      while (!done) {
+        done = line(&sx, &sy, player->position.to[0], player->position.to[1]);
+        if (distance > 50 || !get_solid(level.tiles[(sy*level.w)+sx].tile) || entity_get_npc(sx, sy)) {
+          done = 1;
+          break;
+        }
+        distance++;
+      }
+
+      if ((sx != player->position.to[0] || sy != player->position.to[1])) {
+        switch (ent) {
+          case ENTITY_GOBLIN: {
+            goblin(lvl, tx, ty);
+            break;
+          }
+          case ENTITY_GOBLIN_CASTER: {
+            goblin_caster(lvl, tx, ty);
+            break;
+          }
+          case ENTITY_JACKEL: {
+            jackel(lvl, tx, ty);
+            break;
+          }
+          case ENTITY_ZOMBIE: {
+            zombie(lvl, tx, ty);
+            break;
+          }
+          case ENTITY_BAT: {
+            bat(lvl, tx, ty);
+            break;
+          }
+          case ENTITY_BLOB: {
+            blob(lvl, tx, ty, 0);
+            break;
+          }
+          case ENTITY_WIZARD: {
+            wizard(lvl, tx, ty);
+            break;
+          }
+        }
+        a=2000;
+        break;
+      }
+    }
+  }
+}
+
+void place_container(int item, int uses, int number)
+{
+  for (int num=0; num<number; num++) {
+    for (int i=0; i<100; i++) {
+      int tx = rand() % TILES_X;
+      int ty = rand() % TILES_Y;
+      int tile = level.tiles[(ty * level.w) + tx].tile;
+      if (tile != BLOCK_FLOOR && tile != BLOCK_FLOOR+1)
+        continue;
+
+      container(item, uses, tx, ty);
+      break;
+    }
+  }
 }
 
 void generate_dungeon(int depth, int reset)
@@ -156,12 +226,14 @@ void generate_dungeon(int depth, int reset)
     entity_new(&player, IDENT_PLAYER, "PLAYER");
     comp_renderable(player, 38, 255, 255, 255, 255);
     comp_speed(player, 0.5f);
-    comp_stats(player, 100, 1, 5);
+    comp_stats(player, 50, 1, 5);
     comp_inventory(player);
     inventory_add(player, ITEM_WAND_IDENTIFY, 100);
     inventory_add(player, ITEM_POTION_HEALING, 1);
 
     strcpy(player->description, "YOURSELF. NOT OVERLY   INTELLIGENT AND RATHER FEEBLE");
+
+    ui_state = UI_STATE_MENU;
   }
 
   memset(level.tiles, 0, sizeof(tile_t) * level.w * level.h);
@@ -186,31 +258,112 @@ void generate_dungeon(int depth, int reset)
   fov(player);
   system_renderable(player);
 
-  container(ITEM_GEAR_CHAINHELM, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_GEAR_CHAINCHEST, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_GEAR_CHAINLEGS, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_GEAR_IRONBOOTS, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_GEAR_GLOVES, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_GEAR_ARMS, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_GEAR_SHIELD, 1, player->position.to[0], player->position.to[1]);
-  container(ITEM_SCROLL_MAPPING, 1, player->position.to[0], player->position.to[1]);
-
-  for (int i=0; i<5; i++) {
-    int x, y;
-    int tile = 0;
-    while (tile != BLOCK_FLOOR) {
-      x = rand() % level.w;
-      y = rand() % level.h;
-      tile = level.tiles[(y * level.w) + x].tile;
+  switch(dungeon_depth) {
+    case 0: {
+      place_entity(ENTITY_GOBLIN, 1 + (rand() % 2), 4 + (rand() % 3));
+      place_entity(ENTITY_GOBLIN_CASTER, 1, 2 + (rand() % 2));
+      place_entity(ENTITY_BAT, 1, 4 + (rand() % 4));
+      place_entity(ENTITY_JACKEL, 1, 2 + (rand() % 4));
+      place_container(ITEM_POTION_HEALING, 1, 2);
+      place_container(ITEM_SCROLL_MAPPING, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_CHAINHELM, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_CHAINCHEST, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_CHAINLEGS, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_IRONBOOTS, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_GLOVES, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_ARMS, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_SHIELD, 1, 1);
+      if (!(rand() % 10)) place_container(ITEM_GEAR_IRONDAGGER, 1, 1);
+      break;
     }
-    goblin(1, x, y);
-    jackel(1, x, y);
-    zombie(1, x, y);
-    bat(1, x, y);
-    blob(1, x, y, 0);
-    wizard(1, x, y);
-    if (!(rand() % 5))
-      goblin_caster(1, x, y);
+    case 1: {
+      place_entity(ENTITY_GOBLIN, 2 + (rand() % 2), 5 + (rand() % 3));
+      place_entity(ENTITY_GOBLIN_CASTER, 2, 2 + (rand() % 2));
+      place_entity(ENTITY_BAT, 2, 5 + (rand() % 4));
+      place_entity(ENTITY_JACKEL, 2, 4 + (rand() % 4));
+      place_entity(ENTITY_ZOMBIE, 2, 1 + (rand() % 2));
+      place_entity(ENTITY_BLOB, 2, 2);
+      place_container(ITEM_POTION_HEALING, 1, 3);
+      place_container(ITEM_SCROLL_MAPPING, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_WAND_FIREBOLT, 5, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_CHAINHELM, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_CHAINCHEST, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_CHAINLEGS, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_IRONBOOTS, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_GLOVES, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_ARMS, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_SHIELD, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_IRONDAGGER, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_IRONSWORD, 1, 1);
+      break;
+    }
+    case 2: {
+      place_entity(ENTITY_GOBLIN, 3 + (rand() % 2), 5 + (rand() % 3));
+      place_entity(ENTITY_GOBLIN_CASTER, 3, 2 + (rand() % 2));
+      place_entity(ENTITY_BAT, 3, 5 + (rand() % 4));
+      place_entity(ENTITY_JACKEL, 3, 5 + (rand() % 4));
+      place_entity(ENTITY_ZOMBIE, 3, 1 + (rand() % 2));
+      place_entity(ENTITY_BLOB, 3, 3 + (rand() % 2));
+      place_container(ITEM_POTION_HEALING, 1, 2);
+      place_container(ITEM_SCROLL_MAPPING, 1, 1);
+      if (!(rand() % 4)) place_container(ITEM_WAND_FIREBOLT, 5, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_CHAINHELM, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_CHAINCHEST, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_CHAINLEGS, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_IRONBOOTS, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_GLOVES, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_ARMS, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_SHIELD, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_IRONDAGGER, 1, 1);
+      if (!(rand() % 8)) place_container(ITEM_GEAR_IRONSWORD, 1, 1);
+      if (!(rand() % 15)) place_container(ITEM_GEAR_GREATSWORD, 1, 1);
+      break;
+    }
+    case 3: {
+      place_entity(ENTITY_GOBLIN, 4 + (rand() % 2), 3 + (rand() % 3));
+      place_entity(ENTITY_GOBLIN_CASTER, 4 + (rand() % 2), 2 + (rand() % 2));
+      place_entity(ENTITY_BAT, 4 + (rand() % 2), 6 + (rand() % 4));
+      place_entity(ENTITY_JACKEL, 4 + (rand() % 2), 6 + (rand() % 4));
+      place_entity(ENTITY_ZOMBIE, 4 + (rand() % 2), 4 + (rand() % 2));
+      place_entity(ENTITY_BLOB, 4 + (rand() % 2), 8 + (rand() % 4));
+      place_container(ITEM_POTION_HEALING, 1, 2);
+      if (!(rand() % 2)) place_container(ITEM_WAND_FIREBOLT, 5, 1);
+      if (!(rand() % 2)) place_container(ITEM_POTION_HEALING, 1, 2);
+      if (!(rand() % 5)) place_container(ITEM_SCROLL_MAPPING, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_CHAINHELM, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_CHAINCHEST, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_CHAINLEGS, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_IRONBOOTS, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_GLOVES, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_ARMS, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_SHIELD, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_IRONDAGGER, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_IRONSWORD, 1, 1);
+      if (!(rand() % 5)) place_container(ITEM_GEAR_GREATSWORD, 1, 1);
+      break;
+    }
+    case 4: {
+      place_entity(ENTITY_GOBLIN, 5 + (rand() % 2), 3 + (rand() % 3));
+      place_entity(ENTITY_GOBLIN_CASTER, 5 + (rand() % 2), 4 + (rand() % 2));
+      place_entity(ENTITY_BAT, 5 + (rand() % 2), 6 + (rand() % 4));
+      place_entity(ENTITY_JACKEL, 5 + (rand() % 2), 6 + (rand() % 4));
+      place_entity(ENTITY_ZOMBIE, 5 + (rand() % 2), 4 + (rand() % 4));
+      place_entity(ENTITY_BLOB, 5 + (rand() % 2), 12 + (rand() % 6));
+      place_entity(ENTITY_WIZARD, 6 + (rand() % 2), 2 + (rand() % 2));
+      if (!(rand() % 5)) place_container(ITEM_POTION_HEALING, 1, 2);
+      if (!(rand() % 2)) place_container(ITEM_SCROLL_MAPPING, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_CHAINHELM, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_CHAINCHEST, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_CHAINLEGS, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_IRONBOOTS, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_GLOVES, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_ARMS, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_SHIELD, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_IRONDAGGER, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_IRONSWORD, 1, 1);
+      if (!(rand() % 2)) place_container(ITEM_GEAR_GREATSWORD, 1, 1);
+      break;
+    }
   }
 
   // give one mob a key
@@ -222,10 +375,12 @@ void generate_dungeon(int depth, int reset)
 
     ids[id_last++] = i;
   }
-  if (id_last)
+  if (id_last) {
     inventory_add(entity_stack[ids[rand() % id_last]], ITEM_KEY, 1);
-  else
+  } else {
+    place_container(ITEM_KEY, 1, 1);
     P_DBG("Error cannot generate key mob\n");
+  }
 }
 
 
@@ -283,6 +438,8 @@ ERR game_init()
   entity_tiles.ry = 0, entity_tiles.rh = entity_tiles.h;
   entity_tiles.tiles = calloc(1, sizeof(tile_t) * entity_tiles.w * entity_tiles.h);
 
+  ui_state = UI_STATE_MENU;
+
   generate_dungeon(dungeon_depth, 1);
  
   return SUCCESS;
@@ -329,8 +486,13 @@ int game_run()
       }
     }
 
+    if (ui_state == UI_STATE_MENU) {
+      ui_menu();
+    }
+
     // handle entities
     float energy = player->energy;
+    int hp = player->stats.health;
     for (int i=entity_index; i<ENTITY_STACK_MAX; i++) {
       if (ui_rendering)
         break;
@@ -351,16 +513,11 @@ int game_run()
       if (paused && !entity_index)
         break;
         
-      float energy = e->energy;
-      int hp = e->components.stats ? e->stats.health : 0;
       system_stats(e);
       system_ai(e);
       system_inventory(e);
       system_move(e);
       system_renderable(e);
-      if (e->energy == energy && e->components.stats && hp == e->stats.health && e->energy >= (ENERGY_MIN-0.01f)) {
-        e->stats.health = MIN(e->stats.health + 2, e->stats.max_health);
-      }
       system_energy(e);
 
       // did this entity spawn a projectile?
@@ -423,8 +580,10 @@ void game_keypressed(SDL_Scancode key)
     ui_reset();
   }
 
-  if (key == SDL_SCANCODE_Q)
+  if (key == SDL_SCANCODE_Q && !player->alive) {
     game_action_restart();
+    return;
+  }
 
   switch (ui_state) {
     case UI_STATE_INVENTORY: {
@@ -626,6 +785,7 @@ void game_render()
 
   ui_character(player);
 
+  render_tilemap(&entity_tiles);
   render_tilemap(&level);
   render_tilemap(&entity_tiles);
 }
@@ -834,6 +994,7 @@ void game_action_restart()
     return;
   dungeon_depth = 0;
   generate_dungeon(dungeon_depth, 1);
+  ui_state = UI_STATE_MENU;
 }
 
 void game_action_stairs()
